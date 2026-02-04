@@ -1,0 +1,348 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  googleId   String   @unique
+  email      String   @unique
+  name       String
+  picture    String?
+  givenName  String?
+  familyName String?
+  coins      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  contestParticipations ContestParticipation[]
+  questionReports       QuestionReport[]
+  coinHistory           CoinHistory[]
+  wheelSpins            WheelSpin[]
+  profile               UserProfile?
+
+  @@map("users")
+}
+
+model UserProfile {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mobileNo   String?
+  whatsappNo String?
+  address    String?
+  city       String?
+  country    String?
+  postalCode String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model Category {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String?
+  imagePath     String
+  backgroundColor String? // Hex color code (e.g., "#FF5733")
+  status        String   @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  contests Contest[]
+
+  @@map("categories")
+}
+
+model Contest {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  imagePath   String
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  // Timing
+  startDate  DateTime? // Optional for daily contests
+  endDate    DateTime? // Optional for daily contests
+  resultDate DateTime? // Optional for daily contests
+
+  // Daily contest fields
+  isDaily        Boolean @default(false)
+  dailyStartTime String? // Time in HH:mm format (e.g., "15:00")
+  dailyEndTime   String? // Time in HH:mm format (e.g., "16:00")
+
+  // Contest details
+  joiningFee    Int    @default(0) // in coins
+  questionCount Int    @default(10)
+  duration      Int    @default(90) // in seconds
+  region        String @default("ALL") // "IND" or "ALL" (rest of world)
+
+  // Prize pool - stored as JSON string, will be parsed
+  prizePool String @default("[\"50000\",\"40000\",\"30000\",\"20000\",\"10000\",\"5000\",\"4000\",\"3000\",\"2000\",\"1000\"]")
+
+  // Scoring
+  marking         Int @default(20) // points per correct answer
+  negativeMarking Int @default(5) // points deducted per wrong answer
+  lifeLineCharge  Int @default(1) // coins charged per lifeline
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  questions      Question[]
+  participations ContestParticipation[]
+
+  @@map("contests")
+}
+
+model Question {
+  id        String  @id @default(uuid())
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+
+  question String
+  type     String  @default("NONE") // "NONE", "IMAGE", "VIDEO", "AUDIO"
+  media    String? // path to media file if type is not NONE
+
+  // Options stored as JSON array
+  options       String // JSON array of 4 options
+  correctOption String // the correct option text
+
+  order Int // order of question in contest
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  reports QuestionReport[]
+
+  @@map("questions")
+}
+
+model FunFact {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  imagePath   String?
+  status      String   @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  questions FunFactQuestion[]
+
+  @@map("funfacts")
+}
+
+model FunFactQuestion {
+  id        String  @id @default(uuid())
+  funFactId String
+  funFact   FunFact @relation(fields: [funFactId], references: [id], onDelete: Cascade)
+
+  question      String
+  type          String  @default("NONE")
+  media         String?
+  options       String // JSON array of 4 options
+  correctOption String
+
+  order Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("funfact_questions")
+}
+
+model ContestParticipation {
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contestId String
+  contest   Contest @relation(fields: [contestId], references: [id])
+
+  score       Int       @default(0)
+  rank        Int?
+  coinsEarned Int       @default(0)
+  answers     String? // JSON array of user answers
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, contestId])
+  @@map("contest_participations")
+}
+
+model QuestionReport {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+
+  reason      String
+  description String?
+
+  status String @default("PENDING") // "PENDING", "RESOLVED", "REJECTED"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("question_reports")
+}
+
+model CoinHistory {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount      Int // positive for earned, negative for spent
+  type        String // "EARNED", "SPENT", "REFUND", "LOGIN"
+  description String
+  contestId   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("coin_history")
+}
+
+model Wheel {
+  id        String   @id @default(uuid())
+  name      String   @default("Spin Wheel")
+  isActive  Boolean  @default(true)
+  spinCost  Int      @default(10) // coins required per spin
+  prizes    String // JSON array of prizes: [{"label": "100", "value": 100, "probability": 0.2}, ...]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  spins WheelSpin[]
+
+  @@map("wheels")
+}
+
+model WheelSpin {
+  id      String @id @default(uuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wheelId String
+  wheel   Wheel  @relation(fields: [wheelId], references: [id])
+
+  prizeLabel String // e.g., "100 Coins"
+  prizeValue Int // actual coins won
+  spinCost   Int // coins spent for this spin
+
+  createdAt DateTime @default(now())
+
+  @@map("wheel_spins")
+}
+
+model VisitorIP {
+  id            String   @id @default(uuid())
+  ipAddress     String   @unique
+  visitCount    Int      @default(1) // Number of sessions (one per day/visit)
+  clickCount    Int      @default(0) // Total clicks across all sessions
+  lastSessionClicks Int  @default(0) // Clicks in the last session
+  lastVisitedPage String?
+  exitPage      String?
+  country       String?
+  countryCode   String?  // e.g., "IN", "US"
+  region        String?  // "IND" or "ALL" based on country
+  deviceType    String?  // "mobile", "tablet", "desktop"
+  os            String?  // Operating system (e.g., "Windows", "iOS", "Android")
+  browser       String?  // Browser name (e.g., "Chrome", "Firefox", "Safari")
+  screenResolution String? // Screen resolution (e.g., "1920x1080")
+  lastSessionStart DateTime? // When the current session started
+  firstVisit     DateTime @default(now())
+  lastVisit      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Header tracking fields
+  cfConnectingIp   String?  // headers.cf-connecting-ip
+  cfIpCountry      String?  // headers.cf-ipcountry
+  origin           String?  // headers.origin
+  referer          String?  // headers.referer
+  secChUa          String?  // headers.sec-ch-ua
+  secChUaFullVersionList String? // headers.sec-ch-ua-full-version-list
+  secChUaPlatform  String?  // headers.sec-ch-ua-platform
+  userAgent        String?  // headers.user-agent
+  xRealIp          String?  // headers.x-real-ip
+  xRequestedWith   String?  // headers.x-requested-with
+  timeStamp        DateTime? // Timestamp when data was collected
+
+  @@map("visitor_ips")
+}
+
+model TwoQuestion {
+  id        String   @id @default(uuid())
+  question  String
+  type      String   @default("NONE") // "NONE", "IMAGE", "VIDEO", "AUDIO"
+  media     String?  // path to media file if type is not NONE
+  options   String   // JSON array of 4 options
+  correctOption String // the correct option text
+  status    String   @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  region   String   @default("ALL") // "IND" or "ALL" - which country/region sees this on intro page (same as Contest)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("two_questions")
+}
+
+model Battle {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  imagePath       String
+  backgroundColorTop String? // Hex color code for gradient top (e.g., "#C0FFE3")
+  backgroundColorBottom String? // Hex color code for gradient bottom (e.g., "#00AB5E")
+  status          String   @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  questions BattleQuestion[]
+
+  @@map("battles")
+}
+
+model BattleQuestion {
+  id        String  @id @default(uuid())
+  battleId  String
+  battle    Battle  @relation(fields: [battleId], references: [id], onDelete: Cascade)
+
+  category      String  // Category name for the question
+  question      String
+  type          String  @default("NONE") // "NONE", "IMAGE", "VIDEO", "AUDIO"
+  media         String? // path to media file if type is not NONE
+  options       String  // JSON array of 4 options
+  correctOption String  // the correct option text
+
+  order Int // order of question in battle
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("battle_questions")
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contact_messages")
+}

@@ -1,0 +1,122 @@
+Which metric measures investment profitability efficiency,ROI,ROE,ROA,EPS,ROI
+Which asset represents company ownership,Stock,Bond,Cash,Gold,Stock
+Which strategy reduces portfolio risk through diversification,Diversification,Leverage,Hedging,Speculation,Diversification
+Which profit remains after all expenses,NetIncome,Revenue,EBITDA,Margin,NetIncome
+Which account earns interest on deposits,Savings,Current,Credit,Loan,Savings
+Which tax applies directly to earnings,Income,Sales,Excise,Customs,Income
+Which market trend signals rising prices,Bull,Bear,Flat,Volatile,Bull
+Which statement shows assets and liabilities,BalanceSheet,Income,CashFlow,Ledger,BalanceSheet
+Which index measures consumer price changes,CPI,GDP,WPI,IPI,CPI
+Which instrument pays fixed interest,Bond,Stock,ETF,Crypto,Bond
+Which concept uses borrowed money to invest,Leverage,Equity,Dividend,Capital,Leverage
+Which ratio measures short term liquidity,Current,Quick,Debt,Profit,Current
+Which term means money owed by customers,Receivables,Payables,Expenses,Capital,Receivables
+Which asset is most liquid,Cash,Gold,Land,Bonds,Cash
+Which event offers shares publicly,IPO,Merger,Buyback,Bonus,IPO
+Which fund tracks market index,ETF,Mutual,Hedge,Pension,ETF
+Which term indicates rising prices,Inflation,Deflation,Recession,Stagnation,Inflation
+Which margin measures operating efficiency,Margin,Revenue,Assets,Liability,Margin
+Which profit excludes tax and interest,EBIT,NetProfit,GrossProfit,Turnover,EBIT
+Which statement tracks cash movement,CashFlow,Income,BalanceSheet,Ledger,CashFlow
+Which metric measures shareholder profitability,ROE,ROI,ROA,EPS,ROE
+Which asset class includes government debt,Bond,Equity,Crypto,Commodity,Bond
+Which concept protects against losses,Hedging,Diversification,Leverage,Speculation,Hedging
+Which value shows earnings per share,EPS,ROI,ROE,DPS,EPS
+Which market trend signals falling prices,Bear,Bull,Flat,Stable,Bear
+Which model charges recurring fees,Subscription,Marketplace,Affiliate,Freemium,Subscription
+Which analysis reviews strengths and weaknesses,SWOT,PEST,Porter,BCG,SWOT
+Which term defines total market size,TAM,SAM,SOM,ROI,TAM
+Which structure separates ownership management,Corporation,Partnership,SoleProprietor,LLP,Corporation
+Which metric measures customer lifetime value,CLV,CAC,CTR,CPA,CLV
+Which pricing starts high then drops,Skimming,Penetration,Freemium,Bundling,Skimming
+Which document outlines company strategy,BusinessPlan,Invoice,Contract,PitchDeck,BusinessPlan
+Which metric calculates acquisition cost,CAC,CPA,CTR,ROI,CAC
+Which term describes rapid scalable growth,Scaling,Outsourcing,Downsizing,Diversifying,Scaling
+Which model earns transaction commission,Marketplace,Subscription,Licensing,Advertising,Marketplace
+Which metric measures customer loss rate,Churn,Retention,Conversion,Engagement,Churn
+Which document summarizes startup idea,PitchDeck,Whitepaper,Contract,Invoice,PitchDeck
+Which strategy focuses existing customers,Retention,Acquisition,Expansion,Growth,Retention
+Which funding stage follows seed,SeriesA,SeriesB,Angel,IPO,SeriesA
+Which method validates ideas quickly,MVP,Prototype,Alpha,Beta,MVP
+Which metric measures business profitability,ROI,ROAS,CTR,CPC,ROI
+Which leadership style encourages participation,Democratic,Autocratic,Laissez,Transactional,Democratic
+Which agreement protects confidential data,NDA,SLA,MoU,Contract,NDA
+Which term means company merger purchase,Acquisition,IPO,SpinOff,Franchise,Acquisition
+Which model licenses intellectual property,Licensing,Subscription,Affiliate,Marketplace,Licensing
+Which strategy lowers cost advantage,CostLeadership,Differentiation,Focus,Premium,CostLeadership
+Which analysis examines political factors,PEST,SWOT,Porter,BCG,PEST
+Which metric measures revenue growth rate,Growth,Churn,Margin,Turnover,Growth
+Which metric measures ad click percentage,CTR,CPM,CPA,ROI,CTR
+Which channel improves organic search visibility,SEO,PPC,Display,Affiliate,SEO
+Which strategy attracts users via content,Inbound,Outbound,Cold,Direct,Inbound
+Which tool tracks website performance,Analytics,CRM,ERP,CDN,Analytics
+Which metric shows cost per impressions,CPM,CPC,CPA,ROI,CPM
+Which automation sends scheduled emails,Drip,Broadcast,Manual,Cold,Drip
+Which tactic targets previous visitors,Remarketing,Branding,Outreach,Prospecting,Remarketing
+Which platform targets professionals,LinkedIn,Instagram,Twitter,Reddit,LinkedIn
+Which KPI tracks goal completions,Conversion,Reach,Frequency,Impressions,Conversion
+Which approach targets niche audiences,Segmentation,Branding,MassMarketing,Promotion,Segmentation
+Which method compares two versions,ABTesting,Sampling,Forecasting,Clustering,ABTesting
+Which metric measures ad revenue efficiency,ROAS,CTR,CPC,CPM,ROAS
+Which channel promotes via influencers,Influencer,Affiliate,Email,Search,Influencer
+Which ad format blends with content,Native,Banner,Popup,Interstitial,Native
+Which process guides leads through funnel,Nurturing,Prospecting,Closing,Upselling,Nurturing
+Which strategy builds brand awareness,Branding,Discounting,ColdCalling,DirectSelling,Branding
+Which platform dominates video ads,YouTube,TikTok,Vimeo,Twitch,YouTube
+Which method uses paid search keywords,SEM,SEO,SMM,SMO,SEM
+Which metric shows audience interaction,Engagement,Reach,Impressions,Frequency,Engagement
+Which channel sends promotional emails,Email,Search,Social,Display,Email
+Which term means repeated brand exposure,Frequency,Reach,Impressions,Clicks,Frequency
+Which metric tracks cost per acquisition,CPA,CPC,CPM,CTR,CPA
+Which interface enables software integration,API,SDK,IDE,GUI,API
+Which language structures web pages,HTML,CSS,JavaScript,Python,HTML
+Which technology secures decentralized records,Blockchain,Cloud,AI,IoT,Blockchain
+Which learning uses labeled data,Supervised,Unsupervised,Reinforcement,Transfer,Supervised
+Which computing delivers online resources,Cloud,Edge,Grid,Local,Cloud
+Which protocol encrypts web traffic,HTTPS,FTP,SMTP,POP,HTTPS
+Which model delivers software subscriptions,SaaS,PaaS,IaaS,OnPrem,SaaS
+Which field learns from data,MachineLearning,Robotics,Vision,NLP,MachineLearning
+Which language dominates data analysis,Python,Java,PHP,CPlusPlus,Python
+Which database stores tabular data,Relational,NoSQL,Graph,KeyValue,Relational
+Which process automates testing,Automation,Debugging,Deployment,Compilation,Automation
+Which architecture separates client server,ClientServer,Monolithic,PeerToPeer,Standalone,ClientServer
+Which technology connects smart devices,IoT,VPN,API,SDK,IoT
+Which feature allows auto scaling,Elasticity,Caching,Latency,Virtualization,Elasticity
+Which process verifies user identity,Authentication,Authorization,Encryption,Firewall,Authentication
+Which AI generates humanlike text,LanguageModel,Classifier,Regressor,Optimizer,LanguageModel
+Which tool controls source versions,Git,Docker,Jenkins,Kubernetes,Git
+Which framework builds user interfaces,React,Angular,Django,Laravel,React
+Which system detects intrusions,IDS,Proxy,Router,VPN,IDS
+Which storage provides fastest access,SSD,HDD,Tape,Optical,SSD
+Which concept protects network access,Firewall,Proxy,Router,Switch,Firewall
+Which service manages containers,Kubernetes,Docker,Git,Jenkins,Kubernetes
+Which model recognizes images,Vision,NLP,Speech,Audio,Vision
+Which exam measures management aptitude,GMAT,GRE,SAT,ACT,GMAT
+Which assessment tests reasoning ability,Aptitude,Memory,Creativity,Language,Aptitude
+Which degree focuses on business management,MBA,BBA,BCom,PhD,MBA
+Which test evaluates English proficiency,IELTS,TOEIC,PTE,Duolingo,IELTS
+Which skill supports problem solving,Analytical,Physical,Artistic,Manual,Analytical
+Which certification validates project management,PMP,SixSigma,ITIL,Scrum,PMP
+Which exam qualifies engineering admission,JEE,NEET,CAT,GATE,JEE
+Which learning emphasizes hands on practice,Experiential,Theoretical,Passive,Remote,Experiential
+Which skill improves employability,Communication,Typing,Drawing,Singing,Communication
+Which exam admits management students,CAT,XAT,SNAP,CMAT,CAT
+Which platform offers online courses,MOOC,LMS,CRM,ERP,MOOC
+Which assessment guides career choice,Aptitude,Memory,Speed,Accuracy,Aptitude
+Which skill supports leadership,DecisionMaking,Observation,Listening,Typing,DecisionMaking
+Which qualification certifies accountants,CA,MBA,CFA,CPA,CA
+Which test measures quantitative skills,Arithmetic,Grammar,Logic,Writing,Arithmetic
+Which learning uses digital delivery,Online,Hybrid,Offline,Blended,Online
+Which exam qualifies law admission,LSAT,CLAT,Bar,MCAT,LSAT
+Which skill boosts productivity,TimeManagement,Multitasking,Speed,Strength,TimeManagement
+Which certification validates analytics skills,DataAnalytics,DevOps,Networking,CloudSecurity,DataAnalytics
+Which practice improves career growth,Upskilling,Resting,Switching,Pausing,Upskilling
+Which exam measures graduate readiness,GRE,GMAT,SAT,ACT,GRE
+Which degree supports academic research,PhD,MBA,BBA,CA,PhD
+Which exam qualifies medical admission,NEET,JEE,CAT,GATE,NEET
+Which skill improves public speaking,Confidence,Speed,Memory,Silence,Confidence
+Which learning blends online offline modes,Blended,Online,Remote,Virtual,Blended
+Which skill improves teamwork effectiveness,Teamwork,Isolation,Silence,Speed,Teamwork
+Which course builds leadership skills,Leadership,Accounting,Design,Programming,Leadership
+Which exam tests analytical writing,AWA,Essay,Report,Summary,AWA
+Which skill supports critical thinking,Reasoning,Memorization,Speed,Copying,Reasoning

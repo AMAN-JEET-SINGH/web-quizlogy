@@ -1,0 +1,528 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-poppins), system-ui, sans-serif;
+  font-weight: 400; /* default normal */
+  background-color: #0D0009; /* purple base */
+  background-image: url("/bg-black.svg"); /* optional */
+  background-repeat: repeat;
+  background-attachment: fixed;
+}
+.app-bg {
+  min-height: 100vh;
+  background-image: url("/bg-black.svg"); /* from public */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed; /* fixed background */
+  min-height: 100vh;
+  display: flex;
+  background-color: #0D0009;
+  justify-content: center;
+}
+.mobile-container {
+  width: 100%;
+  max-width: 494px;
+  min-height: 100vh;
+  background-color: #0D0009; /* app background */
+  border: 1px solid #564C53;
+  border-top: none;
+  border-bottom: none;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+}
+.boxstyle{
+  border-bottom:  1px solid #564C53
+}
+.text-18 {
+  font-size: 18px;
+  line-height: 1;
+}
+.navbox{
+  background-color: #2C2159;
+}
+
+.text-25 {
+  font-size: 25px;
+  line-height: 1;
+}
+.text-20 {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.font-400 { font-weight: 400; }
+.font-500 { font-weight: 500; }
+.font-600 { font-weight: 600; }
+.font-700 { font-weight: 700; }
+.font-900 { font-weight: 900; }
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(200%) translateY(200%) rotate(45deg);
+  }
+}
+
+.shiny-effect {
+  animation: shine 3s infinite;
+}
+
+/* Cute Animations */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rotateIn {
+  0% {
+    opacity: 0;
+    transform: rotate(-180deg) scale(0.5) translateY(-50px);
+  }
+  50% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+  60% {
+    transform: rotate(-10deg) scale(1) translateY(0);
+  }
+  70% {
+    transform: rotate(10deg) scale(1) translateY(0);
+  }
+  80% {
+    transform: rotate(-10deg) scale(1) translateY(0);
+  }
+  90% {
+    transform: rotate(10deg) scale(1) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+}
+
+/* Trophy animation - rotate in then continuous tilt */
+@keyframes trophyRotateAndTilt {
+  0% {
+    opacity: 0;
+    transform: rotate(-180deg) scale(0.5) translateY(-50px);
+  }
+  30% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+  40% {
+    transform: rotate(-15deg) scale(1) translateY(0);
+  }
+  50% {
+    transform: rotate(15deg) scale(1) translateY(0);
+  }
+  60% {
+    transform: rotate(-15deg) scale(1) translateY(0);
+  }
+  70% {
+    transform: rotate(15deg) scale(1) translateY(0);
+  }
+  80% {
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+  85% {
+    transform: rotate(-12deg) scale(1) translateY(0);
+  }
+  90% {
+    transform: rotate(12deg) scale(1) translateY(0);
+  }
+  95% {
+    transform: rotate(-12deg) scale(1) translateY(0);
+  }
+  100% {
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+}
+
+@keyframes trophyContinuousTilt {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-12deg);
+  }
+  50% {
+    transform: rotate(0deg);
+  }
+  75% {
+    transform: rotate(12deg);
+  }
+}
+
+.animate-trophy-rotate-and-tilt {
+  animation: trophyRotateAndTilt 3s ease-out forwards,
+             trophyContinuousTilt 2s ease-in-out 3s infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+}
+
+@keyframes correctAnswer {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes wrongAnswer {
+  0%, 100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  10% {
+    transform: translateX(-8px) rotate(-3deg);
+  }
+  20% {
+    transform: translateX(8px) rotate(3deg);
+  }
+  30% {
+    transform: translateX(-8px) rotate(-3deg);
+  }
+  40% {
+    transform: translateX(8px) rotate(3deg);
+  }
+  50% {
+    transform: translateX(-8px) rotate(-3deg);
+  }
+  60% {
+    transform: translateX(8px) rotate(3deg);
+  }
+  70% {
+    transform: translateX(-6px) rotate(-2deg);
+  }
+  80% {
+    transform: translateX(6px) rotate(2deg);
+  }
+  90% {
+    transform: translateX(-4px) rotate(-1deg);
+  }
+}
+
+@keyframes numberCount {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes confetti {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes cuteSway {
+  0%, 100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-8px) rotate(-5deg);
+  }
+  75% {
+    transform: translateX(8px) rotate(5deg);
+  }
+}
+
+@keyframes clockTick {
+  0% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(6deg);
+  }
+  50% {
+    transform: rotate(0deg);
+  }
+  75% {
+    transform: rotate(-6deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-cute-sway {
+  animation: cuteSway 2s ease-in-out infinite;
+}
+
+.animate-clock-tick {
+  animation: clockTick 2s linear infinite;
+}
+
+.animate-bounce-cute {
+  animation: bounce 0.6s ease-in-out;
+}
+
+.animate-pulse-cute {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.5s ease-out;
+}
+
+.animate-slide-in-down {
+  animation: slideInDown 0.5s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s ease-out;
+}
+
+.animate-rotate-in {
+  animation: rotateIn 3s ease-out;
+}
+
+.animate-timer-pulse {
+  animation: timerPulse 1s ease-in-out infinite;
+}
+
+.animate-correct-answer {
+  animation: correctAnswer 0.5s ease-out;
+}
+
+.animate-wrong-answer {
+  animation: wrongAnswer 0.5s ease-out;
+}
+
+.animate-number-count {
+  animation: numberCount 0.3s ease-out;
+}
+
+/* Audience Poll Animation - Bars fluctuating like audience is guessing */
+@keyframes audiencePollFluctuate {
+  0%, 100% {
+    transform: scaleY(1);
+    opacity: 0.8;
+  }
+  25% {
+    transform: scaleY(0.7);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scaleY(1.2);
+    opacity: 1;
+  }
+  75% {
+    transform: scaleY(0.9);
+    opacity: 0.7;
+  }
+}
+
+@keyframes audiencePollGrow {
+  0% {
+    width: 0%;
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-audience-poll {
+  animation: audiencePollFluctuate 1.5s ease-in-out infinite;
+}
+
+.animate-audience-poll-grow {
+  animation: audiencePollGrow 2s ease-out forwards;
+}
+
+/* Contest Play Page Animations */
+@keyframes questionSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes answerOptionSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes timerCountdown {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes scoreBounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes questionIndicatorPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+.animate-question-slide-in {
+  animation: questionSlideIn 0.6s ease-out forwards;
+}
+
+.animate-answer-option-slide-in {
+  animation: answerOptionSlideIn 0.5s ease-out forwards;
+}
+
+.animate-timer-countdown {
+  animation: timerCountdown 1s ease-in-out infinite;
+}
+
+.animate-score-bounce {
+  animation: scoreBounce 0.5s ease-out;
+}
+
+.animate-question-indicator-pulse {
+  animation: questionIndicatorPulse 1.5s ease-in-out infinite;
+}

@@ -1,0 +1,28 @@
+.random-image {
+  position: fixed;
+  width: 120px;
+  height: auto;
+  opacity: 0;
+  pointer-events: none;
+  animation: popIn 0.6s ease-out forwards;
+  z-index: 50;
+}
+
+/* Hide random images when battle result section is visible */
+.battle-result-section ~ * .random-image,
+body:has(.battle-result-section) .random-image {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}

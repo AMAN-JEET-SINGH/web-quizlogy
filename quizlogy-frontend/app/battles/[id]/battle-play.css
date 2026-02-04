@@ -1,0 +1,347 @@
+.battle-play-page {
+  min-height: fit-content;
+  background: #0D0009;
+  color: #ffffff;
+  padding: 20px;
+}
+
+.battle-loading {
+  text-align: center;
+  padding: 100px 20px;
+  color: #a0a0a0;
+}
+
+.battle-opponent-selection {
+  display: flex;
+  background: black;
+  border-radius: 24px;
+  padding: 2px 20px;
+}
+
+.opponent-card {
+  background: black;
+  border-radius: 24px;
+  padding: 48px 40px;
+  max-width: 700px;
+  width: 100%;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+
+.opponent-title {
+  text-align: center;
+  font-size: 24px;
+  font-weight:6700;
+  color: white;
+  margin-bottom: 40px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.opponent-vs-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.opponent-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+.opponent-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #87CEEB 0%, #B0E0E6 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  position: relative;
+  transition: transform 0.9s ease;
+
+}
+
+.opponent-avatar-spin {
+  position: relative;
+  overflow: hidden;
+}
+
+.opponent-avatar-spin.spinning {
+  background: transparent;
+  
+}
+
+.user-avatar-scroll {
+  position: relative;
+  overflow: hidden;
+}
+
+.user-avatar-scroll.spinning {
+  background: transparent;
+  
+}
+
+/* Scroll container for continuous scrolling effect */
+.avatar-scroll-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.avatar-scroll-item {
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+}
+
+.avatar-scroll-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* Continuous scrolling animation - loops infinitely */
+/* This moves one avatar height (100px) every cycle for seamless looping */
+@keyframes scroll-up-continuous {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-100px);
+  }
+}
+
+/* Opponent avatar scrolling */
+.opponent-avatar-spin.spinning .avatar-scroll-container {
+  animation: scroll-up-continuous 0.2s linear infinite;
+}
+
+.opponent-avatar-spin:not(.spinning) .avatar-scroll-container {
+  animation: none;
+  transform: translateY(0);
+  display: none;
+}
+
+.opponent-avatar-spin.spinning > img {
+  display: none;
+}
+
+/* User avatar scrolling */
+.user-avatar-scroll.spinning .avatar-scroll-container {
+  animation: scroll-up-continuous 0.2s linear infinite;
+}
+
+.user-avatar-scroll:not(.spinning) .avatar-scroll-container {
+  animation: none;
+  transform: translateY(0);
+  display: none;
+}
+
+.user-avatar-scroll.spinning > img {
+  display: none;
+}
+
+
+
+.opponent-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #87CEEB 0%, #B0E0E6 100%);
+  transition: opacity 0.9s ease-in-out;
+}
+
+.opponent-avatar-spin > img,
+.user-avatar-scroll > img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.opponent-name {
+  font-size: 16px;
+  font-weight: 600;
+  background:#FFF6D9;
+  color: black;
+  border-radius: 20px;
+  text-align: center;
+  width: 90%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.vs-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+}
+
+.vs-text {
+  font-size: 36px;
+  font-weight: 900;
+  color: #0D0009;
+  position: relative;
+  letter-spacing: -3px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1;
+}
+
+/* VS diagonal line - can be replaced with image */
+.vs-text::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -10%;
+  right: -10%;
+  height: 4px;
+  background: #0D0009;
+  transform: translateY(-50%) rotate(-25deg);
+  z-index: 1;
+}
+
+/* Alternative: Use VS image if provided */
+.vs-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.opponent-selected-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 30px;
+}
+
+.redirect-message {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0D0009;
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.btn-start-battle {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 28px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-start-battle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.btn-start-battle:active {
+  transform: translateY(0);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .opponent-card {
+    padding: 36px 24px;
+  }
+
+  .opponent-title {
+    font-size: 20px;
+    margin-bottom: 36px;
+  }
+
+  .opponent-vs-container {
+    gap: 16px;
+  }
+
+  .opponent-avatar {
+    width: 110px;
+    height: 110px;
+  }
+
+  .avatar-scroll-item {
+    width: 110px;
+    height: 110px;
+  }
+
+  .opponent-name {
+    font-size: 16px;
+  }
+
+  .vs-symbol {
+    width: 60px;
+    height: 60px;
+  }
+
+  .vs-text {
+    font-size: 32px;
+    letter-spacing: -3px;
+  }
+}
+
+@media (max-width: 480px) {
+  .opponent-card {
+    padding: 32px 20px;
+  }
+
+  .opponent-title {
+    font-size: 18px;
+    margin-bottom: 32px;
+  }
+
+  .opponent-vs-container {
+    gap: 12px;
+  }
+
+  .opponent-avatar {
+    width: 100px;
+    height: 100px;
+  }
+
+  .avatar-scroll-item {
+    width: 100px;
+    height: 100px;
+  }
+
+  .opponent-name {
+    font-size: 15px;
+  }
+
+  .vs-symbol {
+    width: 50px;
+    height: 50px;
+  }
+
+  .vs-text {
+    font-size: 28px;
+    letter-spacing: -2px;
+  }
+}

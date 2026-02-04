@@ -1,0 +1,26 @@
+/* Hanging animation for battle rules sections */
+@keyframes hanging {
+  0%, 100% {
+    transform: rotate(-1deg) translateY(0);
+  }
+  50% {
+    transform: rotate(1deg) translateY(2px);
+  }
+}
+
+.battle-rules-banner {
+  animation: hanging 3s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.battle-rules-section {
+  animation: hanging 3s ease-in-out infinite;
+  animation-delay: 0.15s;
+  transform-origin: top center;
+}
+
+.battle-rules-chain {
+  animation: hanging 3s ease-in-out infinite;
+  animation-delay: 0.075s;
+  transform-origin: top center;
+}

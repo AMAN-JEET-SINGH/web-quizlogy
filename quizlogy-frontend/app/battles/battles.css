@@ -1,0 +1,105 @@
+.battles-page {
+  min-height: 100vh;
+  background: #0D0009;
+  color: #ffffff;
+}
+
+.battles-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .battles-container {
+    padding: 20px 16px;
+  }
+}
+
+.battles-header {
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+/* Search Bar */
+.battles-search-container {
+  margin-bottom: 40px;
+}
+
+.battles-search-bar {
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  pointer-events: none;
+}
+
+.battles-search-input {
+  width: 100%;
+  padding: 12px 16px 12px 48px;
+  background: #FFF6D9;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #0D0009;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.battles-search-input::placeholder {
+  color: #666;
+}
+
+.battles-search-input:focus {
+  background: #fff;
+  box-shadow: 0 0 0 2px #FFF6D9;
+}
+
+/* Battles Grid - Using Tailwind classes in component, keeping styles for battle-card */
+
+/* Battle card styles - now using inline styles matching QuizCard */
+.battle-card-wrapper {
+  /* Styles are applied via Tailwind classes in component */
+}
+
+/* Loading, Error, Empty States */
+.battles-loading,
+.battles-error,
+.battles-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #a0a0a0;
+}
+
+.battles-loading p,
+.battles-error p,
+.battles-empty p {
+  font-size: 18px;
+  margin: 0;
+}
+
+.battles-error p {
+  color: #ff6b6b;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .battles-container {
+    padding: 20px 16px;
+  }
+
+  .battles-header h1 {
+    font-size: 28px;
+  }
+
+  /* Grid uses Tailwind classes - responsive handled by Tailwind */
+}
+
+/* Responsive grid handled by Tailwind classes */
