@@ -1,0 +1,498 @@
+.invoice-requests-page {
+  padding: 0;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--admin-text, #111827);
+  margin: 0;
+}
+
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: #fef3c7;
+  color: #d97706;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--admin-card, white);
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-btn:hover {
+  border-color: #9ca3af;
+  color: var(--admin-text, #111827);
+}
+
+.filter-btn.active {
+  background: var(--admin-text, #111827);
+  color: white;
+  border-color: var(--admin-text, #111827);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #6b7280;
+  font-size: 15px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: var(--admin-card, white);
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.invoices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.invoice-card {
+  background: var(--admin-card, white);
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.invoice-card.status-pending {
+  border-color: #fdba74;
+}
+
+.invoice-card.status-approved {
+  border-color: #86efac;
+}
+
+.invoice-card.status-rejected {
+  border-color: #fca5a5;
+}
+
+.invoice-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid var(--admin-border, #e5e7eb);
+}
+
+.invoice-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--admin-text, #111827);
+}
+
+.admin-name {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.pending {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.status-badge.approved {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.status-badge.rejected {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.invoice-details {
+  padding: 16px 20px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--admin-text, #111827);
+}
+
+.detail-row:not(:last-child) {
+  border-bottom: 1px dashed var(--admin-border, #e5e7eb);
+}
+
+.detail-row .positive {
+  color: #10B981;
+}
+
+.detail-row .negative {
+  color: #EF4444;
+}
+
+.detail-row.total {
+  font-weight: 600;
+  padding-top: 12px;
+  margin-top: 8px;
+  border-top: 2px solid var(--admin-border, #e5e7eb);
+  border-bottom: none;
+}
+
+.detail-row.total.inr {
+  font-size: 16px;
+  color: #059669;
+  padding-top: 8px;
+  margin-top: 0;
+  border-top: none;
+}
+
+.invoice-file-section {
+  padding: 12px 20px;
+  border-top: 1px solid var(--admin-border, #e5e7eb);
+}
+
+.btn-view-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f0f9ff;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-view-file:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0369a1;
+}
+
+.invoice-meta {
+  padding: 12px 20px;
+  background: #f9fafb;
+  border-top: 1px solid var(--admin-border, #e5e7eb);
+}
+
+.invoice-meta p {
+  margin: 0;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.invoice-meta p + p {
+  margin-top: 4px;
+}
+
+.rejection-note {
+  color: #dc2626 !important;
+  font-style: italic;
+}
+
+.invoice-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--admin-border, #e5e7eb);
+}
+
+.btn-approve,
+.btn-reject,
+.btn-delete {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-approve {
+  background: #10B981;
+  color: white;
+}
+
+.btn-approve:hover {
+  background: #059669;
+}
+
+.btn-reject {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.btn-reject:hover {
+  background: #fee2e2;
+}
+
+.btn-delete {
+  background: #f9fafb;
+  color: #6b7280;
+  border: 1px solid var(--admin-border, #e5e7eb);
+}
+
+.btn-delete:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-approve:disabled,
+.btn-reject:disabled,
+.btn-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--admin-card, white);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.modal h3 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--admin-text, #111827);
+}
+
+.modal p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.modal textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  resize: vertical;
+  margin-bottom: 16px;
+}
+
+.modal textarea:focus {
+  outline: none;
+  border-color: #6b7280;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-cancel,
+.btn-confirm-reject {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-cancel {
+  background: var(--admin-card, white);
+  color: #6b7280;
+  border: 1px solid var(--admin-border, #e5e7eb);
+}
+
+.btn-cancel:hover {
+  background: #f3f4f6;
+}
+
+.btn-confirm-reject {
+  background: #dc2626;
+  color: white;
+  border: none;
+}
+
+.btn-confirm-reject:hover {
+  background: #b91c1c;
+}
+
+.btn-confirm-reject:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .invoices-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-bar {
+    flex-direction: column;
+  }
+
+  .filter-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ── Dark Mode ── */
+[data-theme="dark"] .pending-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .filter-btn {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .filter-btn:hover {
+  border-color: #3d3d5c;
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .invoice-header {
+  background: #252540;
+  border-bottom-color: #2d2d44;
+}
+
+[data-theme="dark"] .admin-name {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .status-badge.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .status-badge.approved {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+[data-theme="dark"] .status-badge.rejected {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+[data-theme="dark"] .btn-view-file {
+  background: rgba(2, 132, 199, 0.1);
+  color: #38bdf8;
+  border-color: rgba(2, 132, 199, 0.3);
+}
+
+[data-theme="dark"] .btn-view-file:hover {
+  background: rgba(2, 132, 199, 0.2);
+  border-color: rgba(2, 132, 199, 0.5);
+}
+
+[data-theme="dark"] .invoice-meta {
+  background: #252540;
+}
+
+[data-theme="dark"] .invoice-meta p {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .btn-reject {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="dark"] .btn-reject:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="dark"] .btn-delete {
+  background: #252540;
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .btn-delete:hover {
+  background: #2d2d44;
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .modal {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .modal p {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .modal textarea {
+  background: #252540;
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .modal textarea:focus {
+  border-color: #7c3aed;
+}
+
+[data-theme="dark"] .btn-cancel:hover {
+  background: #252540;
+}

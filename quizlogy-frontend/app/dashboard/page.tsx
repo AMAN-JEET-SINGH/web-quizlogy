@@ -97,6 +97,8 @@ export default function DashboardPage() {
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  // Random playing counts assigned per load so live contests sort by "highest players" and order changes on refresh
+  const [liveContestPlayerCounts, setLiveContestPlayerCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchContests();
@@ -168,30 +170,30 @@ export default function DashboardPage() {
       //   contestImageType: typeof c.contestImage
       // })));
       
-      // Sort contests: Active > Upcoming > Past
-      const sortedContests = sortContests(contests);
-      
-      // Filter out upcoming contests (both regular and daily) from dashboard
-      const filteredContests = sortedContests.filter((contest) => {
+      // Only show LIVE contests: daily that are in their time window, or regular that are between start and end
+      const now = new Date();
+      const liveContests = contests.filter((contest) => {
         if (isDailyContest(contest)) {
-          // Only show daily contests that are live
           return isDailyContestLive(contest.dailyStartTime, contest.dailyEndTime);
-        } else {
-          // For regular contests, filter out upcoming ones
-          if (!contest.startDate || !contest.endDate) return false;
-          const now = new Date();
-          const start = new Date(contest.startDate);
-          const end = new Date(contest.endDate);
-          // Only show live or past contests, not upcoming
-          return now >= start;
         }
+        if (!contest.startDate || !contest.endDate) return false;
+        const start = new Date(contest.startDate);
+        const end = new Date(contest.endDate);
+        return now >= start && now <= end;
       });
-      
-      // Get 5-6 contests for vertical list (Quiz Contests For You section)
-      setContestsForYou(filteredContests.slice(0, 5));
-      
-      // Get around 8 contests for Trending Quiz Topics section (also filter out upcoming)
-      setTrendingQuizzes(filteredContests.slice(0, 8));
+
+      // Assign random playing count to each live contest (changes on refresh so order switches)
+      const counts: Record<string, number> = {};
+      liveContests.forEach((c) => {
+        counts[c.id] = Math.floor(Math.random() * 600) + 100; // 100–700
+      });
+      setLiveContestPlayerCounts(counts);
+
+      // Sort by assigned playing count descending (highest players on top)
+      const sortedLive = [...liveContests].sort((a, b) => (counts[b.id] ?? 0) - (counts[a.id] ?? 0));
+
+      setContestsForYou(sortedLive.slice(0, 5));
+      setTrendingQuizzes(sortedLive.slice(0, 8));
     } catch (err) {
       console.error('Error fetching contests:', err);
       setError('Failed to load contests. Please try again.');
@@ -393,24 +395,12 @@ export default function DashboardPage() {
     }
   };
 
-  // Mock player count (in real app, fetch from API)
+  // Use assigned random playing count for live contests (same as used for sorting); 0 otherwise
   const getPlayerCount = (contest: Contest): number => {
-    // Return 0 for upcoming contests
-    if (isDailyContest(contest)) {
-      const isLive = isDailyContestLive(contest.dailyStartTime, contest.dailyEndTime);
-      if (!isLive) return 0;
-    } else {
-      if (!contest.startDate || !contest.endDate) return 0;
-      const now = new Date();
-      const start = new Date(contest.startDate);
-      const end = new Date(contest.endDate);
-      if (now < start) return 0;
-      // For past contests, return a random number in thousands (5k-25k)
-      if (now > end) {
-        return Math.floor(Math.random() * 20 + 5) * 1000; // Returns 5000-25000
-      }
+    if (liveContestPlayerCounts[contest.id] !== undefined) {
+      return liveContestPlayerCounts[contest.id];
     }
-    return Math.floor(Math.random() * 450) + 50;
+    return 0;
   };
 
   return (
@@ -759,46 +749,47 @@ export default function DashboardPage() {
             </div>
 
             {/* Trending Category Cards */}
-            <div className="flex gap-4 overflow-x-auto pb-4 -mx-5 px-5 hide-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex gap-3 overflow-x-auto pb-4 -mx-5 px-5 hide-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {getTrendingCategories().map((category) => {
                 const categoryImageUrl = category.imageUrl || getImageUrl(category.imagePath || category.image || '');
                 const bgColor = category.backgroundColor || '#FFF6D9';
-                
+
                 return (
                   <div
                     key={category.id}
                     onClick={() => router.push(`/category/${encodeURIComponent(category.name)}?id=${category.id}`)}
-                    className="flex-shrink-0 cursor-pointer hover:scale-[1.02] transition-transform shadow-lg flex flex-col items-center justify-center p-4"
-                    style={{ 
-                      width: '140px',
-                      height: '120px',
-                      borderRadius: '15px',
-                      backgroundColor: bgColor
+                    className="flex-shrink-0 cursor-pointer hover:scale-[1.02] transition-transform shadow-lg flex flex-col items-center justify-center rounded-2xl overflow-hidden"
+                    style={{
+                      width: '100px',
+                      height: '100px',
+                      backgroundColor: bgColor,
+                      padding: '10px'
                     }}
                   >
                     {/* Category Icon */}
-                    <div className="flex-1 flex items-center justify-center mb-2">
+                    <div className="flex-1 flex items-center justify-center w-full">
                       {categoryImageUrl ? (
                         <img
                           src={categoryImageUrl}
                           alt={category.name}
-                          className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+                          className="object-contain"
+                          style={{ width: '50px', height: '50px' }}
                           onError={(e) => {
                             const img = e.target as HTMLImageElement;
                             img.style.display = 'none';
                           }}
                         />
                       ) : (
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#0D0009]/10 rounded-full flex items-center justify-center">
-                          <span className="text-2xl font-bold text-[#0D0009]/30">
+                        <div className="w-12 h-12 bg-[#0D0009]/10 rounded-full flex items-center justify-center">
+                          <span className="text-lg font-semibold text-[#0D0009]/40">
                             {category.name.charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Category Name */}
-                    <p className="text-[#0D0009] font-bold text-xs sm:text-sm text-center">
+                    <p className="text-[#0D0009] font-bold text-[10px] text-center leading-tight w-full truncate">
                       {category.name}
                     </p>
                   </div>

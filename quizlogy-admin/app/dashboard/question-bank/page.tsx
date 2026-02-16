@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { questionsApi, categoriesApi, contestsApi, uploadApi, QuestionWithContest, Category, Contest } from '@/lib/api';
 import { getImageUrl } from '@/lib/utils';
+import MultiCountrySelect from '@/components/MultiCountrySelect';
 import * as XLSX from 'xlsx';
 import './question-bank.css';
 
@@ -20,7 +21,7 @@ export default function QuestionBankPage() {
     categoryId: '',
     contestId: '',
     type: '',
-    region: '',
+    country: '',
     search: '',
   });
 
@@ -32,7 +33,7 @@ export default function QuestionBankPage() {
     type: 'NONE' as 'NONE' | 'IMAGE' | 'VIDEO' | 'AUDIO',
     media: '',
     level: '',
-    region: 'ALL',
+    countries: ['ALL'] as string[],
     options: ['', '', '', ''],
     correctOption: '',
   });
@@ -45,10 +46,12 @@ export default function QuestionBankPage() {
     fetchCategories();
     fetchContests();
     fetchQuestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     fetchQuestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const fetchCategories = async () => {
@@ -63,7 +66,7 @@ export default function QuestionBankPage() {
   const fetchContests = async () => {
     try {
       const data = await contestsApi.getAll();
-      setContests(data);
+      setContests(data.data);
     } catch (err) {
       console.error('Error fetching contests:', err);
     }
@@ -76,7 +79,7 @@ export default function QuestionBankPage() {
         categoryId: filters.categoryId || undefined,
         contestId: filters.contestId || undefined,
         type: filters.type || undefined,
-        region: filters.region || undefined,
+        country: filters.country || undefined,
         search: filters.search || undefined,
       });
       setQuestions(response.data);
@@ -153,7 +156,7 @@ export default function QuestionBankPage() {
       type: question.type,
       media: question.media || '',
       level: '',
-      region: question.contest?.region || 'ALL',
+      countries: question.countries || ['ALL'],
       options: parsedOptions.slice(0, 4).map(opt => String(opt || '')),
       correctOption: correctOptionText,
     });
@@ -221,6 +224,7 @@ export default function QuestionBankPage() {
         media: formData.media || undefined,
         options: optionsAsStrings,
         correctOption: String(formData.correctOption || ''),
+        countries: formData.countries,
       };
 
       if (editingQuestion) {
@@ -284,7 +288,7 @@ export default function QuestionBankPage() {
       type: 'NONE',
       media: '',
       level: '',
-      region: 'ALL',
+      countries: ['ALL'],
       options: ['', '', '', ''],
       correctOption: '',
     });
@@ -310,7 +314,7 @@ export default function QuestionBankPage() {
         'Option 3': Array.isArray(question.options) && question.options[2] ? getOptionText(question.options[2], 2) : '',
         'Option 4': Array.isArray(question.options) && question.options[3] ? getOptionText(question.options[3], 3) : '',
         'Correct Option': question.correctOption,
-        'Region': question.contest?.region || '',
+        'Countries': question.countries?.join(', ') || question.contest?.region || 'ALL',
       };
     });
 
@@ -606,14 +610,13 @@ export default function QuestionBankPage() {
             </select>
           </div>
           <div className="filter-group">
-            <label>Region</label>
+            <label>Country</label>
             <select
-              value={filters.region}
-              onChange={(e) => setFilters({ ...filters, region: e.target.value })}
+              value={filters.country}
+              onChange={(e) => setFilters({ ...filters, country: e.target.value })}
             >
-              <option value="">All Regions</option>
-              <option value="ALL">All Regions</option>
-              <option value="IND">India Only</option>
+              <option value="">All Countries</option>
+              <option value="ALL">All Countries</option>
             </select>
           </div>
         </div>
@@ -642,7 +645,7 @@ export default function QuestionBankPage() {
                 <th>Category</th>
                 <th>Contest</th>
                 <th>Type</th>
-                <th>Region</th>
+                <th>Countries</th>
                 <th>Options</th>
                 <th>Actions</th>
               </tr>
@@ -664,6 +667,7 @@ export default function QuestionBankPage() {
                     {question.media && (
                       <div className="question-media">
                         {question.type === 'IMAGE' && (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={getImageUrl(question.media)} alt="Question media" className="media-thumbnail" />
                         )}
                         {question.type === 'VIDEO' && <span>🎥 Video</span>}
@@ -678,7 +682,7 @@ export default function QuestionBankPage() {
                       {question.type}
                     </span>
                   </td>
-                  <td>{question.contest?.region || '-'}</td>
+                  <td>{question.countries?.join(', ') || question.contest?.region || '-'}</td>
                   <td>
                     <div className="options-preview">
                       {question.options.slice(0, 2).map((opt: any, idx: number) => {
@@ -837,15 +841,11 @@ export default function QuestionBankPage() {
               </div>
 
               <div className="form-group">
-                <label>Specify Regions</label>
-                <select
-                  value={formData.region}
-                  onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                >
-                  <option value="">Choose a region</option>
-                  <option value="ALL">All Regions</option>
-                  <option value="IND">India Only</option>
-                </select>
+                <MultiCountrySelect
+                  value={formData.countries}
+                  onChange={(countries) => setFormData({ ...formData, countries })}
+                  label="Countries"
+                />
               </div>
 
               <div className="form-group">
@@ -858,7 +858,7 @@ export default function QuestionBankPage() {
                   <option value="">Choose a contest</option>
                   {contests
                     .filter(c => !formData.categoryId || c.categoryId === formData.categoryId)
-                    .filter(c => !formData.region || c.region === formData.region || formData.region === 'ALL')
+                    .filter(c => true)
                     .map((contest) => (
                       <option key={contest.id} value={contest.id}>
                         {contest.name}

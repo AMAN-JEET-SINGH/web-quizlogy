@@ -206,9 +206,10 @@ export async function trackVisitorIP(req: Request, res: Response, next: NextFunc
       });
     }
 
-    // Attach IP and region info to request for use in routes
+    // Attach IP and country info to request for use in routes
     (req as any).clientIP = ip;
-    (req as any).clientRegion = geoInfo.region || 'ALL';
+    (req as any).clientRegion = geoInfo.region || 'ALL'; // Legacy
+    (req as any).clientCountryCode = geoInfo.countryCode || 'ALL'; // ISO code e.g. "IN", "US"
 
     next();
   } catch (error) {

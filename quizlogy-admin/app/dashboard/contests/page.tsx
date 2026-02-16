@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { contestsApi, Contest, CreateContestData, uploadApi, categoriesApi, Category } from '@/lib/api';
 import { getImageUrl } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -11,9 +11,23 @@ export default function ContestManagement() {
   const [contests, setContests] = useState<Contest[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingContest, setEditingContest] = useState<Contest | null>(null);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  });
   const [formData, setFormData] = useState<CreateContestData>({
     name: '',
     description: '',
@@ -25,7 +39,7 @@ export default function ContestManagement() {
     joiningFee: 0,
     questionCount: 20,
     duration: 60,
-    region: 'ALL',
+    countries: ['ALL'] as string[],
     prizePool: JSON.stringify(["50000", "40000", "30000", "20000", "10000", "5000", "4000", "3000", "2000", "1000"]),
     marking: 20,
     negativeMarking: 5,
@@ -42,11 +56,57 @@ export default function ContestManagement() {
   const [showImageSelection, setShowImageSelection] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [startDateText, setStartDateText] = useState('');
+  const [endDateText, setEndDateText] = useState('');
+  const [resultDateText, setResultDateText] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
+  const startDatePickerRef = useRef<HTMLInputElement>(null);
+  const endDatePickerRef = useRef<HTMLInputElement>(null);
+  const resultDatePickerRef = useRef<HTMLInputElement>(null);
+
+  const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
+  const isValidDateString = (s: string) => YYYY_MM_DD.test(s) && !isNaN(new Date(s + 'T12:00:00').getTime());
+  const isPastDate = (dateOnly: string) => {
+    const today = new Date();
+    const y = today.getFullYear(), m = String(today.getMonth() + 1).padStart(2, '0'), d = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${d}`;
+    return dateOnly < todayStr;
+  };
+
+  // Helpers: get date part (YYYY-MM-DD) or time part (HH:mm) for form inputs. Use local date so display is correct in user's timezone.
+  const getDatePart = (iso: string | null | undefined): string => {
+    if (!iso || typeof iso !== 'string') return '';
+    const s = iso.trim();
+    if (!s) return '';
+    const d = new Date(s);
+    if (isNaN(d.getTime())) {
+      const part = s.indexOf('T') >= 0 ? s.split('T')[0] : s.slice(0, 10);
+      return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : '';
+    }
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const getTimePart = (iso: string | null | undefined): string => {
+    if (!iso || typeof iso !== 'string') return '00:00';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '00:00';
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     fetchContests();
     fetchCategories();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, searchQuery]);
+
+  useEffect(() => {
+    setStartDateText(getDatePart(formData.startDate ?? ''));
+    setEndDateText(getDatePart(formData.endDate ?? ''));
+    setResultDateText(getDatePart(formData.resultDate ?? ''));
+  }, [formData.startDate, formData.endDate, formData.resultDate]);
 
   // Helper function to check if two date-time ranges overlap
   const checkTimeCollision = (
@@ -145,14 +205,20 @@ export default function ContestManagement() {
   const fetchContests = async () => {
     try {
       setLoading(true);
-      const data = await contestsApi.getAll();
-      setContests(data);
+      const response = await contestsApi.getAll({
+        page,
+        limit,
+        search: searchQuery || undefined,
+      });
+      setContests(response.data);
+      setPagination(response.pagination);
       setError(null);
     } catch (err) {
       setError('Failed to fetch contests');
       console.error(err);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   };
 
@@ -167,104 +233,106 @@ export default function ContestManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate time for daily contests
+    setError(null);
+    setFieldErrors({});
+    let committedDates: { startDate: string; endDate: string; resultDate: string } | null = null;
+
     if (isDaily) {
+      const err: Record<string, string> = {};
       if (!fromTime || !toTime) {
-        alert('Please provide both start time and end time for daily contests');
-        return;
+        err.dailyTime = 'Please provide both start time and end time for daily contests';
+      } else {
+        const [startH, startM] = fromTime.split(':').map(Number);
+        const [endH, endM] = toTime.split(':').map(Number);
+        if (endH * 60 + endM <= startH * 60 + startM) {
+          err.dailyTime = 'End time must be after start time';
+        }
       }
-      
-      // Convert times to minutes for comparison
-      const [startHours, startMinutes] = fromTime.split(':').map(Number);
-      const [endHours, endMinutes] = toTime.split(':').map(Number);
-      const startTotalMinutes = startHours * 60 + startMinutes;
-      const endTotalMinutes = endHours * 60 + endMinutes;
-      
-      if (endTotalMinutes <= startTotalMinutes) {
-        alert('End time must be after start time. Please select a valid time range.');
+      if (Object.keys(err).length) {
+        setFieldErrors(err);
+        setError('Please fix the errors below.');
         return;
       }
     } else {
-      // Validate dates for regular contests
-      if (!formData.startDate || !formData.endDate) {
-        alert('Please provide start date and end date for regular contests');
+      const err: Record<string, string> = {};
+      const sStart = startDateText.trim().replace(/\//g, '-');
+      const sEnd = endDateText.trim().replace(/\//g, '-');
+      const sResult = resultDateText.trim().replace(/\//g, '-');
+      if (!sStart) err.startDate = 'Start date is required';
+      else if (!isValidDateString(sStart)) err.startDate = 'Start date must be YYYY-MM-DD (e.g. 2025-12-01)';
+      if (!sEnd) err.endDate = 'End date is required';
+      else if (!isValidDateString(sEnd)) err.endDate = 'End date must be YYYY-MM-DD';
+      if (sStart && isValidDateString(sStart) && sEnd && isValidDateString(sEnd) && sStart >= sEnd) err.startDate = 'Start date must be before end date';
+      if (sResult && !isValidDateString(sResult)) err.resultDate = 'Result date must be YYYY-MM-DD';
+      else if (sResult && sEnd && isValidDateString(sEnd) && sResult < sEnd) err.resultDate = 'Result date must be on or after end date';
+      if (Object.keys(err).length) {
+        setFieldErrors(err);
         return;
       }
-      
-      const startDate = new Date(formData.startDate);
-      const endDate = new Date(formData.endDate);
-      
-      // Prevent past dates
-      const now = new Date();
-      now.setSeconds(0, 0); // Reset seconds and milliseconds for comparison
-      if (startDate < now) {
-        alert('Cannot create contest in the past. Please select a future start date.');
-        return;
-      }
-      
-      if (endDate <= startDate) {
-        alert('End date must be after start date');
-        return;
-      }
-
-      // Check for time collisions in the same category
+      const timeStart = formData.startDate ? getTimePart(formData.startDate) : fromTime || '15:00';
+      const timeEnd = formData.endDate ? getTimePart(formData.endDate) : toTime || '16:00';
+      committedDates = {
+        startDate: new Date(`${sStart}T${timeStart}:00.000`).toISOString(),
+        endDate: new Date(`${sEnd}T${timeEnd}:00.000`).toISOString(),
+        resultDate: sResult ? new Date(`${sResult}T00:00:00.000`).toISOString() : (formData.resultDate ?? ''),
+      };
+      setFormData((prev) => ({ ...prev, ...committedDates }));
       if (formData.categoryId) {
         const collidingContest = checkCollisionWithExisting(
           formData.categoryId,
-          startDate,
-          endDate,
+          new Date(committedDates.startDate),
+          new Date(committedDates.endDate),
           editingContest?.id
         );
-
         if (collidingContest) {
-          const collidingStart = new Date(collidingContest.startDate!);
-          const collidingEnd = new Date(collidingContest.endDate!);
-          alert(
-            `Time collision detected! This contest overlaps with "${collidingContest.name}" ` +
-            `(${collidingStart.toLocaleString()} - ${collidingEnd.toLocaleString()}). ` +
-            `Please select a different time slot.`
-          );
+          setFieldErrors((e) => ({ ...e, dates: `Time overlaps with "${collidingContest.name}". Choose a different slot.` }));
           return;
         }
       }
     }
-    
+
     try {
       const submitData: any = {
         ...formData,
         joiningFee: contestType === 'FREE' ? 0 : formData.joiningFee,
         isDaily: isDaily,
       };
-      
       if (isDaily) {
-        // For daily contests, only send times, not dates
         submitData.dailyStartTime = fromTime;
         submitData.dailyEndTime = toTime;
         submitData.startDate = null;
         submitData.endDate = null;
         submitData.resultDate = null;
       } else {
-        // For regular contests, ensure result date is set
-        submitData.resultDate = formData.resultDate || formData.endDate;
+        if (committedDates) {
+          submitData.startDate = committedDates.startDate;
+          submitData.endDate = committedDates.endDate;
+          submitData.resultDate = committedDates.resultDate || committedDates.endDate;
+        }
         submitData.dailyStartTime = null;
         submitData.dailyEndTime = null;
       }
-      
       if (editingContest) {
         await contestsApi.update(editingContest.id, submitData);
       } else {
         await contestsApi.create(submitData);
       }
+      setFieldErrors({});
+      setError(null);
       resetForm();
       fetchContests();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save contest');
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to save contest';
+      setError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
+      // Do not reset form so user can fix and try again
     }
   };
 
   const handleEdit = (contest: Contest) => {
     setEditingContest(contest);
+    // Inherit countries from the category, not the contest
+    const cat = categories.find(c => c.id === contest.categoryId);
+    const catCountries = cat?.countries || contest.countries || ['ALL'];
     setFormData({
       name: contest.name,
       description: contest.description || '',
@@ -276,7 +344,7 @@ export default function ContestManagement() {
       joiningFee: contest.joiningFee || 0,
       questionCount: contest.questionCount || 20,
       duration: contest.duration || 60,
-      region: contest.region || 'ALL',
+      countries: catCountries,
       prizePool: contest.prizePool || JSON.stringify(["50000", "40000", "30000", "20000", "10000", "5000", "4000", "3000", "2000", "1000"]),
       marking: contest.marking || 20,
       negativeMarking: contest.negativeMarking || 5,
@@ -320,6 +388,9 @@ export default function ContestManagement() {
     
     setQuestionPoolSize(50); // Default, can be enhanced later
     setShowForm(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const toggleSelect = (id: string) => {
@@ -456,7 +527,11 @@ export default function ContestManagement() {
           joiningFee: parseInt(row.joiningFee || row['Joining Fee'] || '0'),
           questionCount: parseInt(row.questionCount || row['Question Count'] || '10'),
           duration: parseInt(row.duration || row.Duration || '90'),
-          region: row.region || row.Region || 'ALL',
+          countries: (() => {
+            // Inherit countries from category
+            const cat = categories.find(c => c.id === categoryId);
+            return cat?.countries || ['ALL'];
+          })(),
           prizePool: JSON.stringify(prizePool),
           marking: parseInt(row.marking || row.Marking || '20'),
           negativeMarking: parseInt(row.negativeMarking || row['Negative Marking'] || '5'),
@@ -548,7 +623,7 @@ export default function ContestManagement() {
       'Joining Fee': item.joiningFee ?? '',
       'Question Count': item.questionCount ?? '',
       Duration: item.duration ?? '',
-      Region: item.region || 'ALL',
+      Countries: Array.isArray(item.countries) ? item.countries.join(', ') : (item.countries || item.region || 'ALL'),
       'Start Date': item.startDate || '',
       'End Date': item.endDate || '',
       'Result Date': item.resultDate || '',
@@ -578,7 +653,11 @@ export default function ContestManagement() {
           joiningFee: parseInt(String(item.joiningFee || 0)),
           questionCount: parseInt(String(item.questionCount || 10)),
           duration: parseInt(String(item.duration || 90)),
-          region: item.region?.trim() || 'ALL',
+          countries: (() => {
+            // Inherit countries from category
+            const cat = categories.find(c => c.id === (item.categoryId?.trim() || ''));
+            return cat?.countries || ['ALL'];
+          })(),
           prizePool: item.prizePool || JSON.stringify(["50000", "40000", "30000", "20000", "10000", "5000", "4000", "3000", "2000", "1000"]),
           marking: parseInt(String(item.marking || 20)),
           negativeMarking: parseInt(String(item.negativeMarking || 5)),
@@ -695,7 +774,7 @@ export default function ContestManagement() {
         'Joining Fee': contest.joiningFee || 0,
         'Question Count': contest.questionCount || 10,
         Duration: contest.duration || 90,
-        Region: contest.region || 'ALL',
+        Countries: contest.countries?.join(', ') || contest.region || 'ALL',
         'Prize Pool': prizePoolArray.join(', '),
         Marking: contest.marking || 20,
         'Negative Marking': contest.negativeMarking || 5,
@@ -721,7 +800,7 @@ export default function ContestManagement() {
       joiningFee: 0,
       questionCount: 20,
       duration: 60,
-      region: 'ALL',
+      countries: ['ALL'],
       prizePool: JSON.stringify(["50000", "40000", "30000", "20000", "10000", "5000", "4000", "3000", "2000", "1000"]),
       marking: 20,
       negativeMarking: 5,
@@ -737,7 +816,7 @@ export default function ContestManagement() {
     setShowForm(false);
   };
 
-  if (loading) {
+  if (initialLoad) {
     return <div className="loading">Loading contests...</div>;
   }
 
@@ -746,6 +825,22 @@ export default function ContestManagement() {
       <div className="admin-page-header page-header">
         <h1>Contest Management</h1>
         <div className="header-actions">
+          <input
+            type="text"
+            placeholder="Search contests..."
+            value={searchInput}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearchInput(value);
+              if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+              searchTimerRef.current = setTimeout(() => {
+                setSearchQuery(value);
+                setPage(1);
+              }, 400);
+            }}
+            className="search-input"
+            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', marginRight: '10px' }}
+          />
           <label className="btn-import">
             Import from Excel
             <input
@@ -777,7 +872,7 @@ export default function ContestManagement() {
       {error && <div className="error-message">{error}</div>}
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="contest-form modern-form">
+        <form ref={formRef} onSubmit={handleSubmit} className="contest-form modern-form">
           <h3>{editingContest ? 'Edit Contest' : 'Add Contest'}</h3>
           
           {/* Contest Image */}
@@ -806,7 +901,8 @@ export default function ContestManagement() {
             </div>
             {formData.imagePath && (
               <div className="image-preview-small">
-                <img 
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={(() => {
                     const url = getImageUrl(formData.imagePath);
                     // Ensure upload URLs use correct port
@@ -828,7 +924,7 @@ export default function ContestManagement() {
           {/* Contest Type Toggle */}
           <div className="form-group">
             <label>Contest Type</label>
-            <div className="toggle-switch">
+            <div className="contest-type-toggle">
               <button
                 type="button"
                 className={`toggle-option ${contestType === 'FREE' ? 'active' : ''}`}
@@ -837,7 +933,7 @@ export default function ContestManagement() {
                   setFormData({ ...formData, joiningFee: 0 });
                 }}
               >
-                Free
+                🎁 Free
               </button>
               <button
                 type="button"
@@ -850,7 +946,7 @@ export default function ContestManagement() {
                   }
                 }}
               >
-                Paid
+                💰 Paid
               </button>
             </div>
           </div>
@@ -893,6 +989,10 @@ export default function ContestManagement() {
                     const endDateTime = new Date(`${nextSlot.endDate}T${nextSlot.endTime}`);
                     const resultDateTime = new Date(`${nextSlot.resultDate}T00:00`);
                     
+                    // Auto-inherit countries from the selected category
+                    const selectedCat = categories.find(c => c.id === newCategoryId);
+                    const catCountries = selectedCat?.countries || ['ALL'];
+
                     setFormData(prev => ({
                       ...prev,
                       categoryId: newCategoryId,
@@ -905,7 +1005,7 @@ export default function ContestManagement() {
                       joiningFee: prev.joiningFee || 0,
                       questionCount: prev.questionCount || 20,
                       duration: prev.duration || 60,
-                      region: prev.region || 'ALL',
+                      countries: catCountries,
                       marking: prev.marking || 20,
                       negativeMarking: prev.negativeMarking || 5,
                       lifeLineCharge: prev.lifeLineCharge || 10,
@@ -914,7 +1014,10 @@ export default function ContestManagement() {
                     setToTime(nextSlot.endTime);
                   }
                 } else {
-                  setFormData({ ...formData, categoryId: newCategoryId });
+                  // Auto-inherit countries from the selected category
+                  const selectedCat = categories.find(c => c.id === newCategoryId);
+                  const catCountries = selectedCat?.countries || ['ALL'];
+                  setFormData({ ...formData, categoryId: newCategoryId, countries: catCountries });
                 }
               }}
               required
@@ -960,18 +1063,22 @@ export default function ContestManagement() {
             </select>
           </div>
 
-          {/* Pick a Region */}
+          {/* Countries (inherited from category) */}
           <div className="form-group">
-            <label>Pick a Region</label>
-            <select
-              value={formData.region || 'ALL'}
-              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-              className="form-select"
-            >
-              <option value="">Choose a region</option>
-              <option value="ALL">All Regions</option>
-              <option value="IND">India Only</option>
-            </select>
+            <label>Countries</label>
+            <div style={{
+              padding: '8px 12px',
+              background: 'var(--admin-muted-bg, #f3f4f6)',
+              border: '1px solid var(--admin-border, #d1d5db)',
+              borderRadius: '6px',
+              fontSize: '14px',
+              color: 'var(--admin-text-muted, #6b7280)',
+            }}>
+              {(formData.countries || ['ALL']).join(', ')}
+              <span style={{ marginLeft: '8px', fontSize: '12px', opacity: 0.7 }}>
+                (inherited from category)
+              </span>
+            </div>
           </div>
 
           {/* Daily Contest Checkbox */}
@@ -1001,240 +1108,221 @@ export default function ContestManagement() {
           {isDaily ? (
             /* Daily Contest - Only Times */
             <>
+              {fieldErrors.dailyTime && <div className="field-error-message">{fieldErrors.dailyTime}</div>}
               <div className="form-row">
                 <div className="form-group">
                   <label>Daily Start Time *</label>
                   <input
                     type="time"
                     value={fromTime}
-                    onChange={(e) => {
-                      setFromTime(e.target.value);
-                      // Validate that end time is after start time
-                      if (toTime && e.target.value >= toTime) {
-                        alert('End time must be after start time');
-                        return;
-                      }
-                    }}
+                    onChange={(e) => setFromTime(e.target.value)}
+                    className={fieldErrors.dailyTime ? 'field-error' : ''}
                     required
                   />
-                  <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                    Contest starts at this time every day
-                  </small>
                 </div>
                 <div className="form-group">
                   <label>Daily End Time *</label>
                   <input
                     type="time"
                     value={toTime}
-                    onChange={(e) => {
-                      setToTime(e.target.value);
-                      // Validate that end time is after start time
-                      if (fromTime && e.target.value <= fromTime) {
-                        alert('End time must be after start time');
-                        return;
-                      }
-                    }}
+                    onChange={(e) => setToTime(e.target.value)}
+                    className={fieldErrors.dailyTime ? 'field-error' : ''}
                     required
                   />
-                  <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                    Contest ends at this time every day
-                  </small>
                 </div>
               </div>
             </>
           ) : (
             /* Regular Contest - Dates and Times */
             <>
-              {/* Start Date */}
+              {/* Start Date - type YYYY-MM-DD or use calendar button */}
               <div className="form-group">
-                <label>Start Date *</label>
-                <input
-                  type="date"
-                  min={new Date().toISOString().split('T')[0]}
-                  value={formData.startDate ? new Date(formData.startDate).toISOString().split('T')[0] : ''}
-                  onChange={(e) => {
-                    const date = e.target.value;
-                    const selectedDate = new Date(`${date}T00:00`);
-                    const now = new Date();
-                    now.setHours(0, 0, 0, 0);
-                    
-                    if (selectedDate < now) {
-                      alert('Cannot select a past date. Please select today or a future date.');
-                      return;
-                    }
-                    
-                    const time = fromTime || '15:00';
-                    const newStartDate = new Date(`${date}T${time}`);
-                    
-                    // Auto-set end date to 7 days from start date
-                    const newEndDate = new Date(newStartDate);
-                    newEndDate.setDate(newEndDate.getDate() + 7);
-                    
-                    // Auto-set result date to 1 day after end date
-                    const newResultDate = new Date(newEndDate);
-                    newResultDate.setDate(newResultDate.getDate() + 1);
-                    
-                    setFormData({ 
-                      ...formData, 
-                      startDate: newStartDate.toISOString(),
-                      endDate: newEndDate.toISOString(),
-                      resultDate: newResultDate.toISOString(),
-                    });
-                    
-                    // Update end time to match end date
-                    setToTime(`${String(newEndDate.getHours()).padStart(2, '0')}:${String(newEndDate.getMinutes()).padStart(2, '0')}`);
-                    
-                    // Check for collision if category is selected
-                    if (formData.categoryId && !editingContest) {
-                      const collidingContest = checkCollisionWithExisting(
-                        formData.categoryId,
-                        newStartDate,
-                        newEndDate
-                      );
-                      if (collidingContest) {
-                        const collidingStart = new Date(collidingContest.startDate!);
-                        const collidingEnd = new Date(collidingContest.endDate!);
-                        alert(
-                          `Warning: This time overlaps with "${collidingContest.name}" ` +
-                          `(${collidingStart.toLocaleString()} - ${collidingEnd.toLocaleString()})`
-                        );
+                <label>Start Date * (YYYY-MM-DD)</label>
+                <div className="date-field-with-calendar">
+                  <input
+                    type="text"
+                    placeholder="YYYY-MM-DD"
+                    value={startDateText}
+                    onChange={(e) => setStartDateText(e.target.value)}
+                    onBlur={() => {
+                      const s = startDateText.trim().replace(/\//g, '-');
+                      if (!s) {
+                        setFormData({ ...formData, startDate: '' });
+                        setFieldErrors((e) => ({ ...e, startDate: '' }));
+                        return;
                       }
-                    }
-                  }}
-                  required
-                />
-              </div>
-
-              {/* End Date */}
-              <div className="form-group">
-                <label>End Date * (Auto-set to 7 days from start)</label>
-                <input
-                  type="date"
-                  min={formData.startDate ? new Date(formData.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                  value={formData.endDate ? new Date(formData.endDate).toISOString().split('T')[0] : ''}
-                  onChange={(e) => {
-                    const date = e.target.value;
-                    const selectedDate = new Date(`${date}T00:00`);
-                    const startDate = formData.startDate ? new Date(formData.startDate) : new Date();
-                    startDate.setHours(0, 0, 0, 0);
-                    
-                    if (selectedDate < startDate) {
-                      alert('End date must be after start date.');
-                      return;
-                    }
-                    
-                    const time = toTime || '16:00';
-                    const newEndDate = new Date(`${date}T${time}`);
-                    
-                    // Auto-set result date to 1 day after end date
-                    const newResultDate = new Date(newEndDate);
-                    newResultDate.setDate(newResultDate.getDate() + 1);
-                    
-                    setFormData({ 
-                      ...formData, 
-                      endDate: newEndDate.toISOString(),
-                      resultDate: newResultDate.toISOString(),
-                    });
-                    
-                    // Check for collision if category and start date are selected
-                    if (formData.categoryId && formData.startDate && !editingContest) {
-                      const startDate = new Date(formData.startDate);
-                      const collidingContest = checkCollisionWithExisting(
-                        formData.categoryId,
-                        startDate,
-                        newEndDate
-                      );
-                      if (collidingContest) {
-                        const collidingStart = new Date(collidingContest.startDate!);
-                        const collidingEnd = new Date(collidingContest.endDate!);
-                        alert(
-                          `Warning: This time overlaps with "${collidingContest.name}" ` +
-                          `(${collidingStart.toLocaleString()} - ${collidingEnd.toLocaleString()})`
-                        );
+                      if (!isValidDateString(s)) {
+                        setFieldErrors((e) => ({ ...e, startDate: 'Use YYYY-MM-DD (e.g. 2025-12-01)' }));
+                        return;
                       }
-                    }
-                  }}
-                  required
-                />
-                <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                  Automatically set to 7 days from start date. Result date will be 1 day after end date.
-                </small>
+                      const time = formData.startDate ? getTimePart(formData.startDate) : fromTime || '15:00';
+                      setFormData({ ...formData, startDate: new Date(`${s}T${time}:00.000`).toISOString() });
+                      setFieldErrors((e) => ({ ...e, startDate: '' }));
+                    }}
+                    className={fieldErrors.startDate ? 'field-error' : ''}
+                    aria-label="Start date"
+                  />
+                  <input
+                    ref={startDatePickerRef}
+                    type="date"
+                    className="hidden-date-picker"
+                    value={startDateText && isValidDateString(startDateText) ? startDateText : ''}
+                    onChange={(e) => {
+                      const date = e.target.value;
+                      if (!date) return;
+                      setStartDateText(date);
+                      const time = formData.startDate ? getTimePart(formData.startDate) : fromTime || '15:00';
+                      setFormData((prev) => ({ ...prev, startDate: new Date(`${date}T${time}:00.000`).toISOString() }));
+                      setFieldErrors((e) => ({ ...e, startDate: '' }));
+                    }}
+                    aria-hidden
+                    tabIndex={-1}
+                  />
+                  <button
+                    type="button"
+                    className="calendar-btn"
+                    onClick={() => startDatePickerRef.current?.showPicker?.()}
+                    title="Open calendar"
+                    aria-label="Open calendar"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </button>
+                </div>
+                {fieldErrors.startDate && <span className="field-error-text">{fieldErrors.startDate}</span>}
               </div>
 
-              {/* Result Date */}
+              {/* End Date - type YYYY-MM-DD or use calendar button */}
               <div className="form-group">
-                <label>Result Date (Auto-set to 1 day after end date)</label>
-                <input
-                  type="date"
-                  min={formData.endDate ? new Date(formData.endDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
-                  value={formData.resultDate ? new Date(formData.resultDate).toISOString().split('T')[0] : ''}
-                  onChange={(e) => {
-                    const date = e.target.value;
-                    const selectedDate = new Date(`${date}T00:00`);
-                    const endDate = formData.endDate ? new Date(formData.endDate) : new Date();
-                    endDate.setHours(0, 0, 0, 0);
-                    
-                    if (formData.endDate && selectedDate < endDate) {
-                      alert('Result date must be on or after end date.');
-                      return;
-                    }
-                    
-                    setFormData({ ...formData, resultDate: new Date(`${date}T00:00`).toISOString() });
-                  }}
-                />
-                <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                  Automatically set to 1 day after end date
-                </small>
+                <label>End Date * (YYYY-MM-DD)</label>
+                <div className="date-field-with-calendar">
+                  <input
+                    type="text"
+                    placeholder="YYYY-MM-DD"
+                    value={endDateText}
+                    onChange={(e) => setEndDateText(e.target.value)}
+                    onBlur={() => {
+                      const s = endDateText.trim().replace(/\//g, '-');
+                      if (!s) {
+                        setFormData({ ...formData, endDate: '' });
+                        setFieldErrors((e) => ({ ...e, endDate: '' }));
+                        return;
+                      }
+                      if (!isValidDateString(s)) {
+                        setFieldErrors((e) => ({ ...e, endDate: 'Use YYYY-MM-DD (e.g. 2025-12-01)' }));
+                        return;
+                      }
+                      const time = formData.endDate ? getTimePart(formData.endDate) : toTime || '16:00';
+                      setFormData({ ...formData, endDate: new Date(`${s}T${time}:00.000`).toISOString() });
+                      setFieldErrors((e) => ({ ...e, endDate: '' }));
+                    }}
+                    className={fieldErrors.endDate ? 'field-error' : ''}
+                    aria-label="End date"
+                  />
+                  <input
+                    ref={endDatePickerRef}
+                    type="date"
+                    className="hidden-date-picker"
+                    value={endDateText && isValidDateString(endDateText) ? endDateText : ''}
+                    onChange={(e) => {
+                      const date = e.target.value;
+                      if (!date) return;
+                      setEndDateText(date);
+                      const time = formData.endDate ? getTimePart(formData.endDate) : toTime || '16:00';
+                      setFormData((prev) => ({ ...prev, endDate: new Date(`${date}T${time}:00.000`).toISOString() }));
+                      setFieldErrors((e) => ({ ...e, endDate: '' }));
+                    }}
+                    aria-hidden
+                    tabIndex={-1}
+                  />
+                  <button type="button" className="calendar-btn" onClick={() => endDatePickerRef.current?.showPicker?.()} title="Open calendar" aria-label="Open calendar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </button>
+                </div>
+                {fieldErrors.endDate && <span className="field-error-text">{fieldErrors.endDate}</span>}
               </div>
 
-              {/* From time and To time */}
+              {/* Result Date - type YYYY-MM-DD or use calendar button */}
+              <div className="form-group">
+                <label>Result Date (YYYY-MM-DD)</label>
+                <div className="date-field-with-calendar">
+                  <input
+                    type="text"
+                    placeholder="YYYY-MM-DD"
+                    value={resultDateText}
+                    onChange={(e) => setResultDateText(e.target.value)}
+                    onBlur={() => {
+                      const s = resultDateText.trim().replace(/\//g, '-');
+                      if (!s) {
+                        setFormData({ ...formData, resultDate: '' });
+                        setFieldErrors((e) => ({ ...e, resultDate: '' }));
+                        return;
+                      }
+                      if (!isValidDateString(s)) {
+                        setFieldErrors((e) => ({ ...e, resultDate: 'Use YYYY-MM-DD' }));
+                        return;
+                      }
+                      const endPart = getDatePart(formData.endDate ?? '');
+                      if (endPart && s < endPart) {
+                        setFieldErrors((e) => ({ ...e, resultDate: 'Result date must be on or after end date' }));
+                        return;
+                      }
+                      setFormData({ ...formData, resultDate: new Date(`${s}T00:00:00.000`).toISOString() });
+                      setFieldErrors((e) => ({ ...e, resultDate: '' }));
+                    }}
+                    className={fieldErrors.resultDate ? 'field-error' : ''}
+                    aria-label="Result date"
+                  />
+                  <input
+                    ref={resultDatePickerRef}
+                    type="date"
+                    className="hidden-date-picker"
+                    min={endDateText && isValidDateString(endDateText) ? endDateText : undefined}
+                    value={resultDateText && isValidDateString(resultDateText) ? resultDateText : ''}
+                    onChange={(e) => {
+                      const date = e.target.value;
+                      if (!date) return;
+                      setResultDateText(date);
+                      setFormData((prev) => ({ ...prev, resultDate: new Date(`${date}T00:00:00.000`).toISOString() }));
+                      setFieldErrors((e) => ({ ...e, resultDate: '' }));
+                    }}
+                    aria-hidden
+                    tabIndex={-1}
+                  />
+                  <button type="button" className="calendar-btn" onClick={() => resultDatePickerRef.current?.showPicker?.()} title="Open calendar" aria-label="Open calendar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6"/>
+                      <line x1="8" y1="2" x2="8" y2="6"/>
+                      <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                  </button>
+                </div>
+                {fieldErrors.resultDate && <span className="field-error-text">{fieldErrors.resultDate}</span>}
+              </div>
+              {fieldErrors.dates && <div className="field-error-message">{fieldErrors.dates}</div>}
+
+              {/* Start Time and End Time - only update that field's time, keep dates unchanged */}
               <div className="form-row">
                 <div className="form-group">
                   <label>Start Time</label>
                   <input
                     type="time"
-                    value={fromTime}
+                    value={formData.startDate ? getTimePart(formData.startDate) : fromTime}
                     onChange={(e) => {
-                      setFromTime(e.target.value);
-                      if (formData.startDate) {
-                        const date = new Date(formData.startDate).toISOString().split('T')[0];
-                        const newStartDate = new Date(`${date}T${e.target.value}`);
-                        
-                        // Auto-update end date to 7 days from start
-                        const newEndDate = new Date(newStartDate);
-                        newEndDate.setDate(newEndDate.getDate() + 7);
-                        
-                        // Auto-update result date to 1 day after end
-                        const newResultDate = new Date(newEndDate);
-                        newResultDate.setDate(newResultDate.getDate() + 1);
-                        
-                        setFormData({ 
-                          ...formData, 
-                          startDate: newStartDate.toISOString(),
-                          endDate: newEndDate.toISOString(),
-                          resultDate: newResultDate.toISOString(),
-                        });
-                        
-                        // Update end time
-                        setToTime(`${String(newEndDate.getHours()).padStart(2, '0')}:${String(newEndDate.getMinutes()).padStart(2, '0')}`);
-                        
-                        // Check for collision if category is selected
-                        if (formData.categoryId && !editingContest) {
-                          const collidingContest = checkCollisionWithExisting(
-                            formData.categoryId,
-                            newStartDate,
-                            newEndDate
-                          );
-                          if (collidingContest) {
-                            const collidingStart = new Date(collidingContest.startDate!);
-                            const collidingEnd = new Date(collidingContest.endDate!);
-                            alert(
-                              `Warning: This time overlaps with "${collidingContest.name}" ` +
-                              `(${collidingStart.toLocaleString()} - ${collidingEnd.toLocaleString()})`
-                            );
-                          }
-                        }
-                      }
+                      const t = e.target.value;
+                      setFromTime(t);
+                      const datePart = formData.startDate ? getDatePart(formData.startDate) : getDatePart(new Date().toISOString());
+                      setFormData({ ...formData, startDate: new Date(`${datePart}T${t}:00.000`).toISOString() });
                     }}
                   />
                 </div>
@@ -1242,50 +1330,12 @@ export default function ContestManagement() {
                   <label>End Time</label>
                   <input
                     type="time"
-                    value={toTime}
+                    value={formData.endDate ? getTimePart(formData.endDate) : toTime}
                     onChange={(e) => {
-                      setToTime(e.target.value);
-                      if (formData.endDate) {
-                        const date = new Date(formData.endDate).toISOString().split('T')[0];
-                        const newEndDate = new Date(`${date}T${e.target.value}`);
-                        
-                        // Validate end time is after start time
-                        if (formData.startDate) {
-                          const startDate = new Date(formData.startDate);
-                          if (newEndDate <= startDate) {
-                            alert('End time must be after start time');
-                            return;
-                          }
-                        }
-                        
-                        // Auto-update result date to 1 day after end
-                        const newResultDate = new Date(newEndDate);
-                        newResultDate.setDate(newResultDate.getDate() + 1);
-                        
-                        setFormData({ 
-                          ...formData, 
-                          endDate: newEndDate.toISOString(),
-                          resultDate: newResultDate.toISOString(),
-                        });
-                        
-                        // Check for collision if category is selected
-                        if (formData.categoryId && formData.startDate && !editingContest) {
-                          const startDate = new Date(formData.startDate);
-                          const collidingContest = checkCollisionWithExisting(
-                            formData.categoryId,
-                            startDate,
-                            newEndDate
-                          );
-                          if (collidingContest) {
-                            const collidingStart = new Date(collidingContest.startDate!);
-                            const collidingEnd = new Date(collidingContest.endDate!);
-                            alert(
-                              `Warning: This time overlaps with "${collidingContest.name}" ` +
-                              `(${collidingStart.toLocaleString()} - ${collidingEnd.toLocaleString()})`
-                            );
-                          }
-                        }
-                      }
+                      const t = e.target.value;
+                      setToTime(t);
+                      const datePart = formData.endDate ? getDatePart(formData.endDate) : getDatePart(new Date().toISOString());
+                      setFormData({ ...formData, endDate: new Date(`${datePart}T${t}:00.000`).toISOString() });
                     }}
                   />
                 </div>
@@ -1406,7 +1456,8 @@ export default function ContestManagement() {
                 <div className="item-image">
                   {item.imagePath ? (
                     <div className="image-preview-small">
-                      <img 
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={(() => {
                           const url = getImageUrl(item.imagePath);
                           // Ensure upload URLs use correct port
@@ -1483,6 +1534,7 @@ export default function ContestManagement() {
               <th>Image</th>
               <th>Name</th>
               <th>Category</th>
+              <th>Countries</th>
               <th>Start Date</th>
               <th>End Date</th>
               <th>Joining Fee</th>
@@ -1535,6 +1587,7 @@ export default function ContestManagement() {
                     </label>
                   </td>
                   <td>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={(() => {
                         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
@@ -1575,6 +1628,7 @@ export default function ContestManagement() {
                     )}
                   </td>
                   <td>{contest.category?.name || contest.categoryId}</td>
+                  <td>{contest.countries?.join(', ') || contest.region || 'ALL'}</td>
                   <td>
                     {isDailyContest 
                       ? (contest as any).dailyStartTime || 'N/A'
@@ -1585,7 +1639,13 @@ export default function ContestManagement() {
                       ? (contest as any).dailyEndTime || 'N/A'
                       : formatDate(contest.endDate)}
                   </td>
-                  <td>{contest.joiningFee || 0} coins</td>
+                  <td>
+                    {contest.joiningFee > 0 ? (
+                      <span className="contest-type-badge contest-type-paid">💰 {contest.joiningFee} coins</span>
+                    ) : (
+                      <span className="contest-type-badge contest-type-free">🎁 Free</span>
+                    )}
+                  </td>
                   <td>
                     <span className={`status-badge status-${getStatus().toLowerCase().replace('_', '-')}`}>
                       {getStatus()}
@@ -1610,7 +1670,32 @@ export default function ContestManagement() {
           <div className="no-data">No contests found. Create one to get started!</div>
         )}
       </div>
-      
+
+      {/* Pagination */}
+      {!loading && pagination.totalPages > 1 && (
+        <div className="pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '20px', marginBottom: '20px' }}>
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
+          >
+            Previous
+          </button>
+          <span className="pagination-info" style={{ color: '#666' }}>
+            Page {pagination.page} of {pagination.totalPages} ({pagination.total} total contests)
+          </span>
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+            disabled={page === pagination.totalPages}
+            style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', cursor: page === pagination.totalPages ? 'not-allowed' : 'pointer', opacity: page === pagination.totalPages ? 0.5 : 1 }}
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       {/* Image Gallery Modal - Always available */}
       <ImageGallery
         isOpen={showGallery}

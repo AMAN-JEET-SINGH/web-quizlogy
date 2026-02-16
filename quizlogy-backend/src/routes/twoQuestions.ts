@@ -34,50 +34,71 @@ function getImageUrl(imagePath: string): string | null {
   }
 }
 
-// Get random two questions for intro page (filtered by user country/region)
+// Get random two questions for intro page (filtered by user country)
 router.get('/random', async (req: Request, res: Response) => {
   try {
     const count = parseInt(req.query.count as string) || 2;
     const excludeIds = req.query.excludeIds ? (req.query.excludeIds as string).split(',').filter(id => id.trim() !== '') : [];
 
-    // Determine user region: India (IND) sees only IND questions, others see only ALL questions
-    // Prefer: query param (region=IND|ALL) -> cf-ipcountry header (IN -> IND) -> IP geo lookup
-    const queryRegion = req.query.region as string;
+    // Determine user country code
+    // Prefer: query param (country=IN|US|...) -> cf-ipcountry header -> IP geo lookup -> "ALL"
+    const queryCountry = req.query.country as string;
     const cfCountry = req.headers['cf-ipcountry'] as string | undefined;
-    const ipGeo = getCountryFromIP(getClientIP(req));
-    let userRegion: 'IND' | 'ALL' = 'ALL';
-    if (queryRegion === 'IND' || queryRegion === 'ALL') {
-      userRegion = queryRegion;
-    } else if (cfCountry === 'IN') {
-      userRegion = 'IND';
-    } else {
-      userRegion = (ipGeo.region === 'IND' ? 'IND' : 'ALL') as 'IND' | 'ALL';
+    const clientCountryCode = (req as any).clientCountryCode as string | undefined;
+    let userCountry = 'ALL';
+    if (queryCountry && queryCountry !== 'ALL') {
+      userCountry = queryCountry.toUpperCase();
+    } else if (cfCountry) {
+      userCountry = cfCountry.toUpperCase();
+    } else if (clientCountryCode && clientCountryCode !== 'ALL') {
+      userCountry = clientCountryCode;
     }
 
-    // India users see only IND questions; other countries see only ALL questions
-    const whereClause: any = {
-      status: 'ACTIVE',
-      region: userRegion,
-    };
-
+    // Filter: prioritize country-specific questions over "ALL"
+    const baseWhere: any = { status: 'ACTIVE' };
     if (excludeIds.length > 0) {
-      whereClause.id = {
-        notIn: excludeIds,
-      };
+      baseWhere.id = { notIn: excludeIds };
     }
 
-    let allQuestions = await prisma.twoQuestion.findMany({
-      where: whereClause,
-    });
+    let allQuestions: any[] = [];
 
-    // If we've excluded all questions, reset and fetch from all questions (same region filter)
-    if (allQuestions.length < count && excludeIds.length > 0) {
+    if (userCountry !== 'ALL') {
+      // Priority 1: Try country-specific questions first
       allQuestions = await prisma.twoQuestion.findMany({
-        where: {
-          status: 'ACTIVE',
-          region: userRegion,
-        },
+        where: { ...baseWhere, countries: { contains: `"${userCountry}"` } },
       });
+
+      // Priority 2: Fall back to "ALL" questions if not enough
+      if (allQuestions.length < count) {
+        const globalQuestions = await prisma.twoQuestion.findMany({
+          where: { ...baseWhere, countries: { contains: '"ALL"' } },
+        });
+        // Add ALL questions that aren't already included
+        const existingIds = new Set(allQuestions.map(q => q.id));
+        allQuestions = [...allQuestions, ...globalQuestions.filter(q => !existingIds.has(q.id))];
+      }
+    } else {
+      allQuestions = await prisma.twoQuestion.findMany({ where: baseWhere });
+    }
+
+    // If we've excluded all questions, reset without excludeIds
+    if (allQuestions.length < count && excludeIds.length > 0) {
+      const resetWhere: any = { status: 'ACTIVE' };
+      if (userCountry !== 'ALL') {
+        // Same priority: country-specific first, then ALL
+        allQuestions = await prisma.twoQuestion.findMany({
+          where: { ...resetWhere, countries: { contains: `"${userCountry}"` } },
+        });
+        if (allQuestions.length < count) {
+          const globalQuestions = await prisma.twoQuestion.findMany({
+            where: { ...resetWhere, countries: { contains: '"ALL"' } },
+          });
+          const existingIds = new Set(allQuestions.map(q => q.id));
+          allQuestions = [...allQuestions, ...globalQuestions.filter(q => !existingIds.has(q.id))];
+        }
+      } else {
+        allQuestions = await prisma.twoQuestion.findMany({ where: resetWhere });
+      }
     }
 
     if (allQuestions.length === 0) {
@@ -125,10 +146,13 @@ router.get('/random', async (req: Request, res: Response) => {
   }
 });
 
-// Get all two questions (admin only)
+// Get all two questions (admin only) - with pagination
 router.get('/', isAdmin, async (req: Request, res: Response) => {
   try {
     const { status, search } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
 
     const where: any = {};
 
@@ -143,11 +167,16 @@ router.get('/', isAdmin, async (req: Request, res: Response) => {
       };
     }
 
+    // Get total count for pagination
+    const total = await prisma.twoQuestion.count({ where });
+
     const questions = await prisma.twoQuestion.findMany({
       where,
       orderBy: {
         createdAt: 'desc',
       },
+      skip,
+      take: limit,
     });
 
     const transformedQuestions = questions.map((q) => {
@@ -160,6 +189,11 @@ router.get('/', isAdmin, async (req: Request, res: Response) => {
         options = [];
       }
 
+      let qCountries: string[] = ['ALL'];
+      try {
+        qCountries = JSON.parse(q.countries);
+      } catch {}
+
       return {
         id: q.id,
         question: q.question,
@@ -169,6 +203,7 @@ router.get('/', isAdmin, async (req: Request, res: Response) => {
         correctOption: q.correctOption != null ? String(q.correctOption) : q.correctOption,
         status: q.status,
         region: q.region || 'ALL',
+        countries: qCountries,
         createdAt: q.createdAt,
         updatedAt: q.updatedAt,
       };
@@ -177,7 +212,13 @@ router.get('/', isAdmin, async (req: Request, res: Response) => {
     res.json({
       status: true,
       data: transformedQuestions,
-      total: transformedQuestions.length,
+      total,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error('Error fetching two questions:', error);
@@ -227,6 +268,11 @@ router.get('/:id', isAdmin, async (req: Request, res: Response) => {
       options = [];
     }
 
+    let qCountries: string[] = ['ALL'];
+    try {
+      qCountries = JSON.parse(question.countries);
+    } catch {}
+
     res.json({
       status: true,
       data: {
@@ -238,6 +284,7 @@ router.get('/:id', isAdmin, async (req: Request, res: Response) => {
         correctOption: question.correctOption != null ? String(question.correctOption) : question.correctOption,
         status: question.status,
         region: question.region || 'ALL',
+        countries: qCountries,
         createdAt: question.createdAt,
         updatedAt: question.updatedAt,
       },
@@ -251,13 +298,21 @@ router.get('/:id', isAdmin, async (req: Request, res: Response) => {
 // Create a new two question (admin only)
 router.post('/', isAdmin, async (req: AdminRequest, res: Response) => {
   try {
-    const { question, type, media, options, correctOption, status, region } = req.body;
+    const { question, type, media, options, correctOption, status, region, countries } = req.body;
 
     if (!question || !options || !correctOption) {
       return res.status(400).json({ error: 'Missing required fields: question, options, correctOption' });
     }
 
     const validRegion = region === 'IND' ? 'IND' : 'ALL';
+
+    // Build countries JSON — prefer new countries array, fall back to legacy region
+    let countriesJson = '["ALL"]';
+    if (Array.isArray(countries) && countries.length > 0) {
+      countriesJson = JSON.stringify(countries.map((c: string) => c.toUpperCase()));
+    } else if (region === 'IND') {
+      countriesJson = '["IN"]'; // Legacy compat
+    }
 
     // Validate options is an array or can be parsed as JSON
     let optionsArray: string[] = [];
@@ -296,6 +351,7 @@ router.post('/', isAdmin, async (req: AdminRequest, res: Response) => {
         correctOption: correctOptionStr,
         status: status || 'ACTIVE',
         region: validRegion,
+        countries: countriesJson,
       },
     });
 
@@ -310,6 +366,7 @@ router.post('/', isAdmin, async (req: AdminRequest, res: Response) => {
         correctOption: correctOptionStr,
         status: newQuestion.status,
         region: newQuestion.region || 'ALL',
+        countries: (() => { try { return JSON.parse(newQuestion.countries); } catch { return ['ALL']; } })(),
         createdAt: newQuestion.createdAt,
         updatedAt: newQuestion.updatedAt,
       },
@@ -324,7 +381,7 @@ router.post('/', isAdmin, async (req: AdminRequest, res: Response) => {
 router.put('/:id', isAdmin, async (req: AdminRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { question, type, media, options, correctOption, status, region } = req.body;
+    const { question, type, media, options, correctOption, status, region, countries } = req.body;
 
     // Check if question exists
     const existingQuestion = await prisma.twoQuestion.findUnique({
@@ -343,6 +400,15 @@ router.put('/:id', isAdmin, async (req: AdminRequest, res: Response) => {
     if (media !== undefined) updateData.media = media || null;
     if (status !== undefined) updateData.status = status;
     if (region !== undefined) updateData.region = region === 'IND' ? 'IND' : 'ALL';
+
+    // Handle countries array
+    if (countries !== undefined) {
+      if (Array.isArray(countries) && countries.length > 0) {
+        updateData.countries = JSON.stringify(countries.map((c: string) => c.toUpperCase()));
+      } else {
+        updateData.countries = '["ALL"]';
+      }
+    }
 
     // Handle options
     if (options !== undefined) {
@@ -410,6 +476,11 @@ router.put('/:id', isAdmin, async (req: AdminRequest, res: Response) => {
       optionsArray = [];
     }
 
+    let updatedCountries: string[] = ['ALL'];
+    try {
+      updatedCountries = JSON.parse(updatedQuestion.countries);
+    } catch {}
+
     res.json({
       status: true,
       data: {
@@ -421,6 +492,7 @@ router.put('/:id', isAdmin, async (req: AdminRequest, res: Response) => {
         correctOption: updatedQuestion.correctOption,
         status: updatedQuestion.status,
         region: updatedQuestion.region || 'ALL',
+        countries: updatedCountries,
         createdAt: updatedQuestion.createdAt,
         updatedAt: updatedQuestion.updatedAt,
       },

@@ -1,0 +1,138 @@
+.terms-page {
+  min-height: 100vh;
+  background: #f8f9fb;
+  display: flex;
+  flex-direction: column;
+}
+
+.terms-top-bar {
+  height: 6px;
+  background: linear-gradient(90deg, #0099ff 0%, #0055cc 50%, #6600cc 100%);
+  flex-shrink: 0;
+}
+
+.terms-container {
+  flex: 1;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+  width: 100%;
+}
+
+.terms-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #5b21b6;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 20px;
+  transition: color 0.2s;
+}
+
+.terms-back-btn:hover {
+  color: #4c1d95;
+}
+
+.terms-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+  padding: 48px 52px;
+  border: 1px solid #e8e8ee;
+}
+
+.terms-card h1 {
+  font-size: 30px;
+  font-weight: 800;
+  color: #1a1a2e;
+  margin: 0 0 6px 0;
+}
+
+.terms-updated {
+  font-size: 14px;
+  color: #7a7a8e;
+  margin: 0 0 36px 0;
+}
+
+.terms-body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.terms-body section h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 10px 0;
+}
+
+.terms-body section p {
+  font-size: 15px;
+  line-height: 1.75;
+  color: #444;
+  margin: 0;
+}
+
+.terms-footer {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid #e8e8ee;
+  text-align: center;
+}
+
+.terms-footer p {
+  font-size: 14px;
+  color: #7a7a8e;
+  margin: 0 0 20px 0;
+  line-height: 1.6;
+}
+
+.terms-back-login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 36px;
+  background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 50%, #6d28d9 100%);
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.terms-back-login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(91, 33, 182, 0.35);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .terms-card {
+    padding: 28px 20px;
+    border-radius: 12px;
+  }
+
+  .terms-card h1 {
+    font-size: 24px;
+  }
+
+  .terms-body section h2 {
+    font-size: 16px;
+  }
+
+  .terms-body section p {
+    font-size: 14px;
+  }
+
+  .terms-container {
+    padding: 20px 12px 40px;
+  }
+}

@@ -316,7 +316,7 @@ export const ContestCard = ({ contest, playerCount = 0, onPlayClick }: ContestCa
           {/* Timer */}
           {timeRemaining && (isLive || isUpcoming) && (
             <div className="flex items-center gap-2 mb-1">
-              <img src={'clock1.svg'} alt="Clock" className="w-4 h-4 object-contain opacity-50" />
+              <img src={'/clock1.svg'} alt="Clock" className="w-4 h-4 object-contain opacity-50" />
               <span className="text-[#FFF6D9] opacity-50 text-sm">
                 {isDaily 
                   ? (isDailyLive ? `Ends in ${timeRemaining}` : `Starts in ${timeRemaining}`)

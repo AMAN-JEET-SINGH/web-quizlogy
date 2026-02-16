@@ -130,9 +130,14 @@
 .error-message {
   background: #f44336;
   color: white;
-  padding: 12px;
+  padding: 12px 16px;
   border-radius: 8px;
   margin-bottom: 20px;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: pre-wrap;
 }
 
 .contest-form {
@@ -176,6 +181,120 @@
   outline: none;
   border-color: var(--admin-primary, #111827);
   box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.1);
+}
+
+/* Date input: type with keyboard or click calendar icon to open picker only */
+.date-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+.date-input-wrapper:focus-within {
+  border-color: var(--admin-primary, #111827);
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.1);
+}
+.date-input-wrapper .date-input-with-picker {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 6px 0 0 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.date-input-wrapper .date-input-with-picker:focus {
+  box-shadow: none;
+}
+.date-picker-trigger {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-left: 1px solid #ddd;
+  border-radius: 0 6px 6px 0;
+  background: #f5f5f5;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.date-picker-trigger:hover {
+  background: #e8e8e8;
+  color: var(--admin-primary, #111827);
+}
+.date-picker-trigger:focus {
+  outline: none;
+}
+
+/* Date text field + small calendar button */
+.date-field-with-calendar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.date-field-with-calendar input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+.hidden-date-picker {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.calendar-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.calendar-btn:hover {
+  background: #e8e8e8;
+  color: var(--admin-primary, #111827);
+}
+.calendar-btn:focus {
+  outline: none;
+}
+.calendar-btn svg {
+  display: block;
+}
+
+/* Validation: red border and message on error (submit or invalid entry) */
+.contest-form .field-error,
+.contest-form input.field-error,
+.contest-form select.field-error {
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+}
+.field-error-text {
+  display: block;
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.field-error-message {
+  color: #dc2626;
+  font-size: 13px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border-radius: 6px;
 }
 
 .contest-form h3 {
@@ -262,36 +381,76 @@
   font-style: italic;
 }
 
-/* Toggle Switch */
-.toggle-switch {
+/* Contest Type Toggle */
+.contest-type-toggle {
   display: flex;
-  background: #f0f0f0;
-  border-radius: 8px;
+  background: #f1f5f9;
+  border-radius: 12px;
   padding: 4px;
   gap: 4px;
+  position: relative;
+  border: 1px solid #e2e8f0;
+  width: 100%;
 }
 
-.toggle-option {
+.contest-type-toggle .toggle-option {
   flex: 1;
-  padding: 10px 20px;
+  padding: 12px 24px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 500;
-  color: #666;
-  transition: all 0.2s;
+  font-weight: 600;
+  color: #94a3b8;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+  letter-spacing: 0.3px;
+  width: auto;
+  height: auto;
 }
 
-.toggle-option.active {
-  background: white;
-  color: #333;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.contest-type-toggle .toggle-option.active {
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.toggle-option:hover {
-  color: #333;
+.contest-type-toggle .toggle-option:first-child.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.contest-type-toggle .toggle-option:last-child.active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.contest-type-toggle .toggle-option:hover:not(.active) {
+  color: #475569;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Contest Type Badges in Table */
+.contest-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.contest-type-free {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.contest-type-paid {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  color: #d97706;
+  border: 1px solid #fcd34d;
 }
 
 /* Form Select */

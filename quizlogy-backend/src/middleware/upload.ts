@@ -13,6 +13,7 @@ if (!fs.existsSync(uploadsDir)) {
 const categoriesDir = path.join(uploadsDir, 'categories');
 const contestsDir = path.join(uploadsDir, 'contests');
 const funfactsDir = path.join(uploadsDir, 'funfacts');
+const invoicesDir = path.join(uploadsDir, 'invoices');
 
 if (!fs.existsSync(categoriesDir)) {
   fs.mkdirSync(categoriesDir, { recursive: true });
@@ -22,6 +23,9 @@ if (!fs.existsSync(contestsDir)) {
 }
 if (!fs.existsSync(funfactsDir)) {
   fs.mkdirSync(funfactsDir, { recursive: true });
+}
+if (!fs.existsSync(invoicesDir)) {
+  fs.mkdirSync(invoicesDir, { recursive: true });
 }
 
 // Storage configuration
@@ -64,6 +68,45 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
 export const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+});
+
+// Invoice upload storage
+const invoiceStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, invoicesDir);
+  },
+  filename: (_req, file, cb) => {
+    const timestamp = Date.now();
+    const random = Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    cb(null, `${timestamp}-${random}-${name}${ext}`);
+  },
+});
+
+const invoiceFileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedMimes = [
+    'application/pdf',
+    'text/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+  ];
+  if (allowedMimes.includes(file.mimetype) || file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PDF, CSV, XLSX, and image files are allowed!'));
+  }
+};
+
+export const invoiceUpload = multer({
+  storage: invoiceStorage,
+  fileFilter: invoiceFileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },

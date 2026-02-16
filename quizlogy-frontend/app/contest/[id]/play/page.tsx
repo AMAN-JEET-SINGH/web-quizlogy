@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { DashboardNav } from '@/components/DashboardNav';
 import { Footer } from '@/components/Footer';
 import { SEOHead } from '@/components/SEOHead';
-import { authApi, User, contestsApi, getImageUrl } from '@/lib/api';
+import { authApi, User, contestsApi, Contest, getImageUrl } from '@/lib/api';
+import { isDailyContest, isDailyContestLive } from '@/lib/dailyContestUtils';
+import { ContestCard } from '@/components/ContestCard';
 import AdsenseAd from '@/components/AdsenseAd';
 
 interface ContestQuestion {
@@ -89,6 +91,56 @@ export default function ContestPlayPage() {
   const wellTriedMusicRef = useRef<HTMLAudioElement>(null);
   const [wasMusicOn, setWasMusicOn] = useState(false); // Track if music was on during contest
   const [audiencePollPercentages, setAudiencePollPercentages] = useState<{ [key: string]: number }>({});
+  const [otherContests, setOtherContests] = useState<Contest[]>([]);
+  const [contestsLoading, setContestsLoading] = useState(false);
+    const [animatedScore, setAnimatedScore] = useState(0);
+  const [animatedCorrect, setAnimatedCorrect] = useState(0);
+  const [animatedWrong, setAnimatedWrong] = useState(0);
+
+  // Animate number counting
+  const animateNumber = useCallback((start: number, end: number, duration: number, setter: (n: number) => void) => {
+    const startTime = Date.now();
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(start + (end - start) * easeOut);
+      setter(current);
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, []);
+
+  // Fetch other contests for the "More Contests" section
+  const fetchOtherContests = useCallback(async () => {
+    try {
+      setContestsLoading(true);
+      const response = await contestsApi.getList();
+      const contests = response.data || [];
+
+      // Filter for LIVE contests (daily in their time window, or regular between start and end)
+      const now = new Date();
+      const liveContests = contests.filter((contest: any) => {
+        if (contest.id === contestId) return false; // Exclude current contest
+        if (isDailyContest(contest)) {
+          return isDailyContestLive(contest.dailyStartTime, contest.dailyEndTime);
+        }
+        if (!contest.startDate || !contest.endDate) return false;
+        const start = new Date(contest.startDate);
+        const end = new Date(contest.endDate);
+        return now >= start && now <= end;
+      });
+
+      // Take up to 5 live contests
+      setOtherContests(liveContests.slice(0, 5));
+    } catch (err) {
+      console.error('Error fetching contests:', err);
+    } finally {
+      setContestsLoading(false);
+    }
+  }, [contestId]);
 
   useEffect(() => {
     fetchContestData();
@@ -562,6 +614,24 @@ export default function ContestPlayPage() {
     }, 500); // Small delay to ensure background music has stopped
   };
 
+  // Trigger animations and fetch other contests when quiz completes
+  useEffect(() => {
+    if (quizCompleted && contest) {
+      const contestQuestionIds = new Set(contest.questions.map(q => q.id));
+      const validAnswers = answers.filter(a => contestQuestionIds.has(a.questionId));
+      const correctCount = validAnswers.filter(a => a.isCorrect).length;
+      const wrongCount = validAnswers.filter(a => !a.isCorrect && a.selectedAnswer && a.selectedAnswer.trim().length > 0).length;
+
+      // Animate numbers with staggered timing
+      setTimeout(() => animateNumber(0, score, 800, setAnimatedScore), 200);
+      setTimeout(() => animateNumber(0, correctCount, 600, setAnimatedCorrect), 400);
+      setTimeout(() => animateNumber(0, wrongCount, 600, setAnimatedWrong), 600);
+
+      // Fetch other contests
+      fetchOtherContests();
+    }
+  }, [quizCompleted, contest, score, answers, animateNumber, fetchOtherContests]);
+
   // Play celebration music when quiz completes
   useEffect(() => {
     if (quizCompleted && contest && !hasPlayedCelebrationMusic.current) {
@@ -925,8 +995,15 @@ export default function ContestPlayPage() {
     return (
       <>
         <DashboardNav />
-        <div className="min-h-screen bg-[#1A0F3D] flex items-center justify-center">
-          <div className="text-white text-lg">Loading contest...</div>
+        <div className="min-h-screen bg-[#0D0009] flex flex-col items-center justify-center px-4">
+          <div className="relative mb-6">
+            <div className="w-14 h-14 rounded-full border-4 border-[#FFF6D9]/20 border-t-[#FFD602] animate-loading-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src="/logo.svg" alt="" className="w-6 h-6 opacity-90" />
+            </div>
+          </div>
+          <p className="text-[#FFF6D9] text-lg font-medium">Loading contest...</p>
+          <p className="text-[#FFD602] text-sm mt-1 font-semibold animate-loading-dots">...</p>
         </div>
         <Footer />
       </>
@@ -937,12 +1014,19 @@ export default function ContestPlayPage() {
     return (
       <>
         <DashboardNav />
-        <div className="min-h-screen bg-[#1A0F3D] flex items-center justify-center p-5">
+        <div className="min-h-screen bg-[#0D0009] flex items-center justify-center p-5">
           <div className="text-center">
-            <p className="text-white text-lg mb-4">Contest not found or no questions available</p>
+            <div className="mb-6">
+              <svg className="w-16 h-16 mx-auto text-[#FFD602] opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-[#FFF6D9] text-lg mb-2 font-semibold">Contest Not Found</p>
+            <p className="text-[#FFF6D9]/70 text-sm mb-6">This contest is unavailable or has no questions.</p>
             <button
               onClick={() => router.push('/dashboard')}
-              className="bg-yellow-400 text-[#392C6E] px-6 py-3 rounded-xl font-bold hover:bg-yellow-500"
+              className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-[#0D0009] px-6 py-3 rounded-xl font-bold hover:from-yellow-500 hover:to-yellow-600 transition-all transform hover:scale-105 shadow-lg"
+              style={{ boxShadow: '0 4px 15px rgba(255, 215, 0, 0.3)' }}
             >
               Go to Dashboard
             </button>
@@ -967,22 +1051,36 @@ export default function ContestPlayPage() {
       return (
         <>
           <DashboardNav />
-          <div className="min-h-screen bg-[#1A0F3D] flex items-center justify-center">
-            <div className="text-white text-lg">Starting quiz...</div>
+          <div className="min-h-screen bg-[#0D0009] flex flex-col items-center justify-center px-4">
+            <div className="relative mb-6">
+              <div className="w-14 h-14 rounded-full border-4 border-[#FFF6D9]/20 border-t-[#FFD602] animate-loading-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img src="/logo.svg" alt="" className="w-6 h-6 opacity-90" />
+              </div>
+            </div>
+            <p className="text-[#FFF6D9] text-lg font-medium">Starting quiz...</p>
+            <p className="text-[#FFD602] text-sm mt-1 font-semibold animate-loading-dots">...</p>
           </div>
           <Footer />
         </>
       );
     }
-    
+
     // If user doesn't have enough coins and hasn't joined, redirect
     if (!hasEnoughCoins && contest.joining_fee > 0) {
       // Redirect will happen in useEffect, but show message while redirecting
       return (
         <>
           <DashboardNav />
-          <div className="min-h-screen bg-[#1A0F3D] flex items-center justify-center">
-            <div className="text-white text-lg">Redirecting to contest rules...</div>
+          <div className="min-h-screen bg-[#0D0009] flex flex-col items-center justify-center px-4">
+            <div className="relative mb-6">
+              <div className="w-14 h-14 rounded-full border-4 border-[#FFF6D9]/20 border-t-[#FFD602] animate-loading-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img src="/logo.svg" alt="" className="w-6 h-6 opacity-90" />
+              </div>
+            </div>
+            <p className="text-[#FFF6D9] text-lg font-medium">Redirecting to contest rules...</p>
+            <p className="text-[#FFD602] text-sm mt-1 font-semibold animate-loading-dots">...</p>
           </div>
           <Footer />
         </>
@@ -1050,11 +1148,11 @@ export default function ContestPlayPage() {
     const uniqueAnswers = Array.from(
       new Map(answers.map(a => [a.questionId, a])).values()
     );
-    
+
     // Limit to actual contest questions
     const contestQuestionIds = new Set(contest?.questions.map(q => q.id) || []);
     const validAnswers = uniqueAnswers.filter(a => contestQuestionIds.has(a.questionId));
-    
+
     const correctCount = validAnswers.filter(a => a.isCorrect).length;
     // Wrong count: answers that are incorrect AND have a selected answer (not empty/null)
     const wrongCount = validAnswers.filter(a => !a.isCorrect && a.selectedAnswer && a.selectedAnswer.trim().length > 0).length;
@@ -1064,7 +1162,7 @@ export default function ContestPlayPage() {
     // Calculate winner announcement time (assuming contest ends at a specific time, for now using placeholder)
     const winnerAnnouncementTime = "5:45 pm"; // This should come from contest data
     const potentialWinnings = contest?.winCoins || 1000;
-    
+
     // Calculate message once and store it (to prevent it from changing)
     const totalQuestions = contest?.contest_question_count || contest?.questions.length || 1;
     const halfQuestions = Math.ceil(totalQuestions / 2);
@@ -1075,70 +1173,92 @@ export default function ContestPlayPage() {
       <>
         {audioElements}
         <DashboardNav />
-        <div className="min-h-screen p-5 pb-20 bg-[#0D0009]" style={{
-          // boxShadow: '0px 0px 2px 0px #FFF6D9'
-        }}>
+
+        <div className="min-h-fit p-5 pb-0 bg-[#0D0009]">
           <div className="max-w-md mx-auto">
-            {/* Header */}
-            <div className="text-center mb-6">
+            {/* Header with animated coins */}
+            <div className="text-center mb-4 animate-slide-in-down">
               <p className="text-[#FFF6D9] text-sm mb-1">{contest?.name || 'Brain Test'}</p>
-              <h1 className="text-[#FFF6D9] text-2xl font-bold mb-2">Play And Win</h1>
+              <h1 className="text-[#FFF6D9] text-2xl font-bold mb-2">Contest Results</h1>
               <div className="flex items-center justify-center gap-2">
-                <img src="/coin2.svg" alt="Coins" className="w-5 h-5" />
-                <span className="text-yellow-400 font-bold text-lg">{(contest?.winCoins || 24000).toLocaleString()}</span>
-                <span className="text-[#FFF6D9] font-bold text-lg">COINS</span>
+                <img src="/coin2.svg" alt="Coins" className="w-6 h-6 animate-coin-spin" />
+                <span className="text-[#FFD700] font-bold text-xl animate-glow-pulse">
+                  {(contest?.winCoins || 24000).toLocaleString()} COINS
+                </span>
               </div>
             </div>
 
-            {/* Results Card */}
-            <div className="bg-[#FFF6D9] rounded-xl p-8 text-center mb-4 border border-[#BFBAA7]" style={{
-              boxShadow: '0px 0px 2px 0px #FFF6D9'
+            {/* Results Card with enhanced animations */}
+            <div className="bg-gradient-to-b from-[#FFF6D9] to-[#F5E6C8] rounded-2xl p-6 text-center mb-4 border border-[#BFBAA7] animate-result-card-slide relative overflow-hidden" style={{
+              boxShadow: '0px 4px 20px rgba(255, 215, 0, 0.3), 0px 0px 2px 0px #FFF6D9'
             }}>
-              {/* Trophy with Stars */}
-              <div className="relative mb-6 flex justify-center items-start">
-                {/* Three stars above trophy */}
-                
-                
-                {/* Trophy Icon - aligned to top center */}
-                <div className="flex justify-center">
-                  <img src="/trophy.svg" alt="Trophy" className="w-30 h-30 animate-trophy-rotate-and-tilt" />
+              {/* Shimmer overlay */}
+              <div className="absolute inset-0 animate-shimmer pointer-events-none" />
+
+              {/* Trophy with enhanced animation */}
+              <div className="relative mb-4 flex justify-center items-center">
+                {/* Sparkle effects around trophy */}
+                <div className="absolute -top-2 -left-4 text-2xl animate-star-sparkle" style={{ animationDelay: '0s' }}>✨</div>
+                <div className="absolute -top-2 -right-4 text-2xl animate-star-sparkle" style={{ animationDelay: '0.5s' }}>✨</div>
+                <div className="absolute top-8 -left-8 text-xl animate-star-sparkle" style={{ animationDelay: '1s' }}>⭐</div>
+                <div className="absolute top-8 -right-8 text-xl animate-star-sparkle" style={{ animationDelay: '1.5s' }}>⭐</div>
+
+                <div className="flex justify-center animate-trophy-rotate-and-tilt">
+                  <img src="/trophy.svg" alt="Trophy" className="w-28 h-28 drop-shadow-2xl" />
                 </div>
               </div>
 
-              {/* Messages */}
-              <p className="text-black text-lg font-800 mb-2">Time is over! Well Played</p>
-              {/* Score */}
-              <p className="text-black font-bold text-lg mb-4">
-                Your Score Is: <span className="text-yellow-400 font-bold">{score} COINS</span>
-              </p>
-              <p className="text-black text-sm mb-1">
-                Winner announcement will be @ {winnerAnnouncementTime}
-              </p>
-              <p className="text-black text-sm mb-6">
-                Based on your current score, you can win {potentialWinnings.toLocaleString()} COINS
+              {/* Messages with celebration effect */}
+              <div className="animate-celebrate-pop" style={{ animationDelay: '0.3s' }}>
+                <p className="text-[#0D0009] text-xl font-bold mb-1">
+                  {showCongratulations ? '🎉 Excellent Performance! 🎉' : '👏 Well Played! 👏'}
+                </p>
+                <p className="text-[#0D0009]/80 text-sm mb-2">
+                  You answered {correctCount} out of {totalQuestions} correctly!
+                </p>
+              </div>
+
+              {/* Score with animation */}
+              <p className="text-[#0D0009] font-bold text-lg mb-4">
+                Your Score: <span className="text-[#FFD700] font-bold animate-glow-pulse">{animatedScore} COINS</span>
               </p>
 
-              {/* Performance Metrics */}
-              <div className="grid grid-cols-4 gap-3 mb-6">
+              <p className="text-[#0D0009]/70 text-sm mb-1">
+                Winner announcement will be @ {winnerAnnouncementTime}
+              </p>
+              <p className="text-[#0D0009]/70 text-sm mb-4">
+                Based on your score, you can win {potentialWinnings.toLocaleString()} COINS
+              </p>
+
+              {/* Performance Metrics with staggered pop animation */}
+              <div className="grid grid-cols-4 gap-2 mb-6">
                 {/* Rank */}
-                <div className="bg-black rounded-lg p-3">
-                  <p className="text-white text-2xl font-bold">{userRank !== null ? userRank : '-'}</p>
-                  <p className="text-white text-xs mt-1">Rank</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#9272FF]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-1 transform hover:scale-105 transition-transform">
+                  <p className="text-[#9272FF] text-2xl font-bold">
+                    {loadingRank ? '...' : (userRank !== null ? userRank : '-')}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Rank</p>
                 </div>
                 {/* Questions */}
-                <div className="bg-black rounded-lg p-3">
-                  <p className="text-white text-2xl font-bold">{contest?.contest_question_count || contest?.questions.length || 0}</p>
-                  <p className="text-white text-xs mt-1">Questions</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#4ECDC4]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-2 transform hover:scale-105 transition-transform">
+                  <p className="text-[#4ECDC4] text-2xl font-bold">
+                    {totalQuestions}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Questions</p>
                 </div>
                 {/* Correct */}
-                <div className="bg-black rounded-lg p-3">
-                  <p className="text-white text-2xl font-bold">{correctCount}</p>
-                  <p className="text-white text-xs mt-1">Correct</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#4CAF50]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-3 transform hover:scale-105 transition-transform">
+                  <p className="text-[#4CAF50] text-2xl font-bold">
+                    {animatedCorrect}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Correct</p>
                 </div>
                 {/* Wrong */}
-                <div className="bg-black rounded-lg p-3">
-                  <p className="text-white text-2xl font-bold">{wrongCount}</p>
-                  <p className="text-white text-xs mt-1">Wrong</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#FF6B6B]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-4 transform hover:scale-105 transition-transform">
+                  <p className="text-[#FF6B6B] text-2xl font-bold">
+                    {animatedWrong}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Wrong</p>
                 </div>
               </div>
 
@@ -1147,14 +1267,15 @@ export default function ContestPlayPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => router.push('/login')}
-                    className="flex-1 bg-yellow-400 text-[#0D0009] font-bold py-3 px-4 rounded-lg hover:bg-yellow-500 relative overflow-hidden"
+                    className="flex-1 bg-gradient-to-r from-yellow-400 to-yellow-500 text-[#0D0009] font-bold py-3 px-4 rounded-xl hover:from-yellow-500 hover:to-yellow-600 relative overflow-hidden transform hover:scale-[1.02] transition-all shadow-lg"
+                    style={{ boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)' }}
                   >
                     <span className="relative z-10">JOIN QUIZWALA</span>
                     <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent shiny-effect"></span>
                   </button>
                   <button
                     onClick={() => router.push('/dashboard')}
-                    className="flex-1 bg-white text-[#0D0009] font-bold py-3 px-4 rounded-lg hover:bg-gray-100"
+                    className="flex-1 bg-[#0D0009] text-[#FFF6D9] font-bold py-3 px-4 rounded-xl hover:bg-[#1a1a2e] border border-[#564C53] transform hover:scale-[1.02] transition-all"
                   >
                     PLAY AS GUEST
                   </button>
@@ -1162,20 +1283,78 @@ export default function ContestPlayPage() {
               ) : (
                 <button
                   onClick={() => router.push('/dashboard')}
-                  className="w-full bg-yellow-400 text-[#0D0009] font-bold py-3 px-4 rounded-lg hover:bg-yellow-500 relative overflow-hidden"
+                  className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-[#0D0009] font-bold py-3 px-4 rounded-xl hover:from-yellow-500 hover:to-yellow-600 relative overflow-hidden transform hover:scale-[1.02] transition-all shadow-lg"
+                  style={{ boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)' }}
                 >
-                  <span className="relative z-10">CONTINUE</span>
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    CONTINUE TO DASHBOARD
+                  </span>
                   <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent shiny-effect"></span>
                 </button>
               )}
             </div>
           </div>
-          <p className="text-center  border-t border-[#564C53] text-white text-xs mt-2 mb-2 font-medium">ADVERTISEMENT</p>
-      <div className="w-full overflow-hidden border-b border-[#564C53]">
-        <AdsenseAd adSlot="8153775072" adFormat="auto" />
-      </div>
         </div>
-        
+
+        {/* Advertisement - Full Width */}
+        <div className="w-full overflow-hidden border-b border-[#564C53]">
+          <p className="text-center border-t border-[#564C53] text-white text-xs mt-2 mb-2 font-medium">ADVERTISEMENT</p>
+          <AdsenseAd adSlot="8153775072" adFormat="auto" />
+        </div>
+
+        {/* More Contests Section */}
+        <div className="bg-[#0D0009] px-5 py-6">
+          <div className="max-w-md mx-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[#FFF6D9] text-lg font-bold flex items-center gap-2">
+                <span>🎮</span> More Contests
+              </h2>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="text-[#FFD700] text-sm font-medium hover:underline"
+              >
+                View All →
+              </button>
+            </div>
+
+            {contestsLoading ? (
+              <div className="text-center text-[#FFF6D9]/70 py-8">
+                <div className="animate-loading-spin w-8 h-8 border-2 border-[#FFD700] border-t-transparent rounded-full mx-auto mb-2"></div>
+                Loading contests...
+              </div>
+            ) : otherContests.length > 0 ? (
+              <div className="space-y-4">
+                {otherContests.map((c, index) => (
+                  <div
+                    key={c.id}
+                    className="animate-slide-in-up"
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  >
+                    <ContestCard
+                      contest={c}
+                      playerCount={Math.floor(Math.random() * 500) + 100}
+                      onPlayClick={() => router.push(`/contest/${c.id}/rules`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-[#FFF6D9]/70 py-8">
+                <p>No other contests available right now.</p>
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="mt-4 text-[#FFD700] font-medium hover:underline"
+                >
+                  Explore Dashboard →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         <Footer />
       </>
     );
@@ -1256,7 +1435,7 @@ export default function ContestPlayPage() {
 
                 {/* Question Card */}
                 
-                <div className=" rounded-lg p-6 mb-4 animate-question-slide-in flex flex-col items-center">
+                <div className=" rounded-lg p-2 mb-1 animate-question-slide-in flex flex-col items-center">
                   <p className="text-black justify-center text-center font-bold text-base leading-relaxed mb-3 sm:mb-4">{currentQuestion.question}</p>
                   {currentQuestion.type === 'IMAGE' && currentQuestion.media && (
                     (() => {
@@ -1386,7 +1565,7 @@ export default function ContestPlayPage() {
                 </div>
 
                 {/* Answer Options */}
-                <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="grid grid-cols-2 gap-3 text-center ">
                   {currentQuestion.options.map((option, index) => {
                       const isSelected = selectedAnswer === option;
                       const isCorrect = option === currentQuestion.correctOption;
@@ -1423,12 +1602,12 @@ export default function ContestPlayPage() {
                         // After answer is selected
                         if (isCorrect) {
                           bgColor = 'bg-green-500 animate-correct-answer';
-                          textColor = 'text-white';
+                          textColor = 'text-white border-1 border-gray-300';
                         } else if (isSelected && !isCorrect) {
-                          bgColor = 'bg-red-500 animate-wrong-answer';
+                          bgColor = 'bg-red-500 animate-wrong-answer border-1 border-red-700';
                           textColor = 'text-white';
                         } else {
-                          bgColor = 'bg-white';
+                          bgColor = 'bg-white border-1 border-gray-300';
                           textColor = 'text-black';
                         }
                       } else {
@@ -1442,7 +1621,7 @@ export default function ContestPlayPage() {
                           key={`${currentQuestionIndex}-${index}`}
                           onClick={() => handleAnswerSelect(option)}
                           disabled={selectedAnswer !== null || !quizStarted || totalTimeRemaining <= 0 || isRemovedByFiftyFifty}
-                          className={`${bgColor} ${textColor} rounded-xl p-4 font-medium disabled:opacity-50 transition-all duration-300 relative overflow-hidden flex items-center justify-center gap-2 ${isRemovedByFiftyFifty ? 'cursor-not-allowed' : ''}`}
+                          className={`${bgColor} ${textColor} rounded-xl p-4 font-medium disabled:opacity-50 transition-all duration-300 relative overflow-hidden flex items-center justify-center gap-2 border-2 border-gray-400 ${isRemovedByFiftyFifty ? 'cursor-not-allowed' : ''}`}
                         >
                           {showAudiencePoll && (
                             <div 

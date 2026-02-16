@@ -21,10 +21,12 @@ export default function ImageGallery({ isOpen, onClose, onSelect, filterType = '
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen) {
       fetchImages();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, selectedType]);
 
   const fetchImages = async () => {
@@ -119,8 +121,9 @@ export default function ImageGallery({ isOpen, onClose, onSelect, filterType = '
                     className="gallery-item"
                   >
                     <div className="gallery-item-image">
-                      <img 
-                        src={image.url} 
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image.url}
                         alt={image.filename}
                         onError={(e) => {
                           console.error('Image failed to load:', image.url);
@@ -189,8 +192,9 @@ export default function ImageGallery({ isOpen, onClose, onSelect, filterType = '
                 </div>
                 <div className="preview-panel-content">
                   <div className="preview-large-image">
-                    <img 
-                      src={previewImage.url} 
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={previewImage.url}
                       alt={previewImage.filename}
                       onError={(e) => {
                         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';

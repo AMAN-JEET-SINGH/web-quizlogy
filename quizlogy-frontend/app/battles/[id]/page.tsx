@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { DashboardNav } from '@/components/DashboardNav';
 import { Footer } from '@/components/Footer';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { SEOHead } from '@/components/SEOHead';
 import { battlesApi, Battle, authApi, User } from '@/lib/api';
 import './battle-play.css';
@@ -211,6 +212,13 @@ export default function BattlePlayPage() {
     }
   }, [opponentSelected]);
 
+  // Handle navigation when countdown reaches 0
+  useEffect(() => {
+    if (countdown === 0 && opponentSelected && battleId) {
+      router.push(`/battles/${battleId}/play`);
+    }
+  }, [countdown, opponentSelected, battleId, router]);
+
   useEffect(() => {
     // Start countdown when opponent is selected
     if (opponentSelected && battleId) {
@@ -218,20 +226,19 @@ export default function BattlePlayPage() {
       const opponentIndex = selectedOpponentIndex + 1;
       localStorage.setItem('battleOpponentName', opponentName);
       localStorage.setItem('battleOpponentIndex', opponentIndex.toString());
-      
+
       // Reset countdown to 3
       setCountdown(3);
-      
+
       // Start countdown interval
       countdownIntervalRef.current = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
-            // When countdown reaches 0, redirect
+            // When countdown reaches 0, clear interval
             if (countdownIntervalRef.current) {
               clearInterval(countdownIntervalRef.current);
               countdownIntervalRef.current = null;
             }
-            router.push(`/battles/${battleId}/play`);
             return 0;
           }
           return prev - 1;
@@ -248,7 +255,7 @@ export default function BattlePlayPage() {
         countdownIntervalRef.current = null;
       }
     };
-  }, [opponentSelected, battleId, selectedOpponentIndex, opponentName, router]);
+  }, [opponentSelected, battleId, selectedOpponentIndex, opponentName]);
 
   const getUserImage = () => {
     if (user?.picture) {
@@ -276,9 +283,7 @@ export default function BattlePlayPage() {
         <SEOHead title="Loading Battle..." description="Loading battle opponent selection..." />
         <div className="battle-play-page">
           <DashboardNav />
-          <div className="battle-loading">
-            <p>Loading battle...</p>
-          </div>
+          <LoadingScreen message="Loading battle..." fullPage />
           <Footer />
         </div>
       </>

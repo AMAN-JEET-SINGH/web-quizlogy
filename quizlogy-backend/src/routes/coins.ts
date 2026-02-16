@@ -69,7 +69,21 @@ router.get('/history', isAuthenticated, async (req: Request, res: Response) => {
       },
       skip,
       take: pageLimit,
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        amount: true,
+        type: true,
+        description: true,
+        contestId: true,
+        status: true,
+        contestName: true,
+        correctAnswers: true,
+        wrongAnswers: true,
+        totalQuestions: true,
+        winningAmount: true,
+        timeTaken: true,
+        createdAt: true,
         user: {
           select: {
             id: true,

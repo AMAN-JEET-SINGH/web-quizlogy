@@ -230,7 +230,7 @@ export const Sidebar = ({ isOpen, onClose, onReportIssueClick }: SidebarProps) =
               {/* Quiz Rules */}
               <button
                 onClick={() => handleMenuClick('/quiz-rules')}
-                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left border-b border-[#FFF6D9]/10"
+                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left"
               >
                 <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -241,7 +241,7 @@ export const Sidebar = ({ isOpen, onClose, onReportIssueClick }: SidebarProps) =
               {/* Coin History */}
               <button
                 onClick={() => handleMenuClick('/coin-history')}
-                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left border-b border-[#FFF6D9]/10"
+                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left"
               >
                 <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -252,7 +252,7 @@ export const Sidebar = ({ isOpen, onClose, onReportIssueClick }: SidebarProps) =
               {/* About Us */}
               <button
                 onClick={() => handleMenuClick('/about-us')}
-                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left border-b border-[#FFF6D9]/10"
+                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left"
               >
                 <div className="w-6 h-6 rounded-full bg-blue-400 flex items-center justify-center">
                   <span className="text-white text-xs font-bold">i</span>
@@ -263,7 +263,7 @@ export const Sidebar = ({ isOpen, onClose, onReportIssueClick }: SidebarProps) =
               {/* Contact Us */}
               <button
                 onClick={() => handleMenuClick('/contact-us')}
-                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left border-b border-[#FFF6D9]/10"
+                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left"
               >
                 <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -279,7 +279,7 @@ export const Sidebar = ({ isOpen, onClose, onReportIssueClick }: SidebarProps) =
                     onReportIssueClick();
                   }
                 }}
-                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left border-b border-[#FFF6D9]/10"
+                className="w-full flex items-center gap-4 px-4 py-3 text-[#FFF6D9] hover:bg-[#0D0009]/80 rounded-lg transition-colors text-left"
               >
                 <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 16v2h2v-2h-2zm0-6v4h2v-4h-2z"/>

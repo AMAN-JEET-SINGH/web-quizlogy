@@ -2,7 +2,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { analyticsApi, AnalyticsData } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { analyticsApi, AnalyticsData, adsenseApi, AdminAdSenseSummary } from '@/lib/api';
+import { useAdmin } from '@/lib/adminContext';
 import './dashboard-home.css';
 
 type TimeRange = '1d' | '7d' | '30d' | '1y' | 'all';
@@ -11,10 +13,22 @@ export default function DashboardHome() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
+  const [adminSummary, setAdminSummary] = useState<AdminAdSenseSummary[]>([]);
+  const [adminSummaryLoading, setAdminSummaryLoading] = useState(false);
+  const { adminData } = useAdmin();
+  const router = useRouter();
 
   useEffect(() => {
     loadAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeRange]);
+
+  useEffect(() => {
+    if (adminData?.isSuperAdmin) {
+      loadAdminSummary();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminData?.isSuperAdmin]);
 
   const loadAnalytics = async () => {
     try {
@@ -25,6 +39,20 @@ export default function DashboardHome() {
       console.error('Error loading analytics:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAdminSummary = async () => {
+    try {
+      setAdminSummaryLoading(true);
+      const res = await adsenseApi.getAdminSummary();
+      if (res.status) {
+        setAdminSummary(res.data);
+      }
+    } catch (error) {
+      console.error('Error loading admin summary:', error);
+    } finally {
+      setAdminSummaryLoading(false);
     }
   };
 
@@ -434,6 +462,64 @@ export default function DashboardHome() {
           </div>
         </div>
       </div>
+
+      {/* Admin Users AdSense Summary (Super Admin only) */}
+      {adminData?.isSuperAdmin && (
+        <div className="admin-summary-section">
+          <h2 className="section-title">ADMIN USERS — ADSENSE SUMMARY (Last 30 Days)</h2>
+          {adminSummaryLoading ? (
+            <div className="loading-state">Loading admin summary...</div>
+          ) : adminSummary.length === 0 ? (
+            <div className="no-data-text">No admin users found</div>
+          ) : (
+            <div className="admin-summary-table-wrap">
+              <table className="admin-summary-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Admin Name</th>
+                    <th>Status</th>
+                    <th className="num">Est. Revenue</th>
+                    <th className="num">Impressions</th>
+                    <th className="num">Imp. RPM</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminSummary.map((admin, index) => (
+                    <tr key={admin.adminId}>
+                      <td>{index + 1}</td>
+                      <td className="admin-name-cell">{admin.username}</td>
+                      <td>
+                        <span className={`admin-status-badge ${admin.isActive ? 'active' : 'inactive'}`}>
+                          {admin.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="num">${admin.earnings.toFixed(2)}</td>
+                      <td className="num">{admin.impressions.toLocaleString()}</td>
+                      <td className="num">${admin.impressionsRpm.toFixed(2)}</td>
+                      <td>
+                        <button
+                          className="btn-see-report"
+                          onClick={() => {
+                            const params = new URLSearchParams();
+                            if (admin.domains.length > 0) {
+                              params.set('domains', admin.domains.join(','));
+                            }
+                            router.push(`/reports?${params.toString()}`);
+                          }}
+                        >
+                          See Report
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

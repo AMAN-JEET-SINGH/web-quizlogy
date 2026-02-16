@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { questionsApi, contestsApi, Question, Contest } from '@/lib/api';
+import MultiCountrySelect from '@/components/MultiCountrySelect';
 import './questions.css';
 
 export default function QuestionsPage() {
@@ -16,16 +17,18 @@ export default function QuestionsPage() {
     loadContests();
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (selectedContest) {
       loadQuestions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedContest]);
 
   const loadContests = async () => {
     try {
       const data = await contestsApi.getAll();
-      setContests(data);
+      setContests(data.data);
     } catch (error) {
       console.error('Error loading contests:', error);
     }
@@ -50,6 +53,7 @@ export default function QuestionsPage() {
     media: string;
     options: string[];
     correctOption: string;
+    countries: string[];
     order: number;
   }>({
     question: '',
@@ -57,6 +61,7 @@ export default function QuestionsPage() {
     media: '',
     options: ['', '', '', ''],
     correctOption: '',
+    countries: ['ALL'],
     order: questions.length + 1,
   });
 
@@ -82,6 +87,7 @@ export default function QuestionsPage() {
         media: editingQuestion.media || '',
         options: options,
         correctOption: editingQuestion.correctOption,
+        countries: editingQuestion.countries || ['ALL'],
         order: editingQuestion.order,
       });
     } else {
@@ -91,6 +97,7 @@ export default function QuestionsPage() {
         media: '',
         options: ['', '', '', ''],
         correctOption: '',
+        countries: ['ALL'],
         order: questions.length + 1,
       });
     }
@@ -148,6 +155,7 @@ export default function QuestionsPage() {
           media: formData.media || undefined,
           options: optionsToSend,
           correctOption: formData.correctOption,
+          countries: formData.countries,
           order: formData.order,
         });
       } else {
@@ -157,6 +165,7 @@ export default function QuestionsPage() {
           media: formData.media || undefined,
           options: optionsToSend,
           correctOption: formData.correctOption,
+          countries: formData.countries,
           order: formData.order,
         });
       }
@@ -367,6 +376,13 @@ export default function QuestionsPage() {
                     </label>
                   </div>
                 ))}
+              </div>
+
+              <div className="form-group">
+                <MultiCountrySelect
+                  value={formData.countries}
+                  onChange={(countries) => setFormData({ ...formData, countries })}
+                />
               </div>
 
               <div className="form-group">

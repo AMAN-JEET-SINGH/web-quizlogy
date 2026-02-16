@@ -563,3 +563,159 @@
   }
 }
 
+/* ═══════════════════════════════════════ */
+/* ── Dark Mode ── */
+/* ═══════════════════════════════════════ */
+
+[data-theme="dark"] .gallery-management-page .page-header h1 {
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .image-count {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .gallery-management-page .error-message {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-left-color: #f87171;
+}
+
+[data-theme="dark"] .gallery-management-page .error-close {
+  color: #f87171;
+}
+
+[data-theme="dark"] .gallery-controls {
+  background: #1a1a2e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .control-group label {
+  color: #c0c0d0;
+}
+
+[data-theme="dark"] .type-filter {
+  background: #252540;
+  border-color: #2d2d44;
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .gallery-management-page .search-input {
+  background: #252540;
+  border-color: #2d2d44;
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .gallery-management-page .search-input::placeholder {
+  color: #6b6b88;
+}
+
+[data-theme="dark"] .gallery-management-page .loading-state,
+[data-theme="dark"] .gallery-management-page .empty-state {
+  background: #1a1a2e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .gallery-management-page .spinner {
+  border-color: #2d2d44;
+  border-top-color: #7c3aed;
+}
+
+[data-theme="dark"] .gallery-management-page .empty-state h3 {
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .gallery-management-page .empty-state p {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .gallery-card {
+  background: #1a1a2e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .gallery-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .card-image-container {
+  background: #252540;
+}
+
+[data-theme="dark"] .card-filename {
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .gallery-management-page .type-categories {
+  background: rgba(25, 118, 210, 0.15);
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .gallery-management-page .type-contests {
+  background: rgba(123, 31, 162, 0.15);
+  color: #c084fc;
+}
+
+[data-theme="dark"] .gallery-management-page .type-funfacts {
+  background: rgba(230, 81, 0, 0.15);
+  color: #fb923c;
+}
+
+[data-theme="dark"] .card-size {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .card-date {
+  color: #6b6b88;
+}
+
+/* Preview Modal */
+[data-theme="dark"] .preview-modal {
+  background: #1a1a2e;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .preview-header {
+  border-bottom-color: #2d2d44;
+}
+
+[data-theme="dark"] .preview-header h2 {
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .preview-close {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .preview-close:hover {
+  background: #252540;
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .preview-image-container {
+  background: #252540;
+}
+
+[data-theme="dark"] .preview-details {
+  border-top-color: #2d2d44;
+}
+
+[data-theme="dark"] .gallery-management-page .detail-row label {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .gallery-management-page .detail-value {
+  color: #c0c0d0;
+}
+
+[data-theme="dark"] .path-value,
+[data-theme="dark"] .url-value {
+  background: #252540;
+  color: #c0c0d0;
+}
+
+[data-theme="dark"] .preview-actions {
+  border-top-color: #2d2d44;
+}
+

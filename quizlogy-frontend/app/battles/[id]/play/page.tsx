@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { DashboardNav } from '@/components/DashboardNav';
 import { Footer } from '@/components/Footer';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { SEOHead } from '@/components/SEOHead';
 import { battlesApi, Battle, authApi, User, getImageUrl as getBattleImageUrl } from '@/lib/api';
 import './battle-play-game.css';
@@ -1180,7 +1181,14 @@ export default function BattlePlayGamePage() {
   };
 
   if (loading || !battle || questions.length === 0) {
-    return null;
+    return (
+      <>
+        <SEOHead title="Loading Battle..." description="Loading battle..." />
+        <DashboardNav />
+        <LoadingScreen message="Preparing your battle..." fullPage />
+        <Footer />
+      </>
+    );
   }
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -1391,10 +1399,11 @@ export default function BattlePlayGamePage() {
                           ${isRemovedByFiftyFifty ? 'opacity-0 invisible pointer-events-none cursor-not-allowed' : ''}
                           ${showResult && isCorrect ? 'bg-green-500 text-white border-green-500 animate-pulse' : ''}
                           ${showResult && isSelected && !isCorrect ? 'bg-red-500 text-white border-red-500 animate-shake' : ''}
+                          ${showResult && !isCorrect && !isSelected ? 'bg-white/90 text-[#0D0009]/90 border-[#FFF6D9]/40' : ''}
                           ${!showResult && !showAudiencePoll ? 'bg-white text-[#0D0009] hover:bg-gray-100 hover:border-[#FFF6D9] hover:-translate-y-0.5 hover:shadow-md' : ''}
                           ${showAudiencePoll ? 'bg-white text-[#0D0009]' : ''}
                           border-2 border-transparent rounded-xl p-3 sm:p-4 text-sm sm:text-base font-semibold cursor-pointer transition-all duration-300 text-center break-words relative overflow-hidden min-h-[2.75rem] sm:min-h-[3.5rem] flex items-center justify-center
-                          disabled:cursor-not-allowed disabled:opacity-70
+                          disabled:cursor-not-allowed disabled:opacity-100
                         `}
                       >
                         {showAudiencePoll && (

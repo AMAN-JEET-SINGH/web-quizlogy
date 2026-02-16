@@ -20,7 +20,9 @@ import analyticsRoutes from './routes/analytics';
 import coinsRoutes from './routes/coins';
 import feedbackRoutes from './routes/feedback';
 import visitorTrackingRoutes from './routes/visitorTracking';
+import adsenseRoutes from './routes/adsense';
 import { trackVisitorIP } from './middleware/ipTracking';
+import { autoSeedCountries } from './utils/seedCountries';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -134,6 +136,10 @@ app.use('/api/two-questions', twoQuestionsRoutes);
 // Admin routes
 app.use('/api/admin', adminRoutes);
 
+// Admin users routes
+import adminUsersRoutes from './routes/adminUsers';
+app.use('/api/admin-users', adminUsersRoutes);
+
 // Analytics routes
 app.use('/api/analytics', analyticsRoutes);
 
@@ -149,6 +155,17 @@ app.use('/api/feedback', feedbackRoutes);
 
 // Visitor tracking routes
 app.use('/api/visitor', visitorTrackingRoutes);
+
+// AdSense routes
+app.use('/api/adsense', adsenseRoutes);
+
+// App Settings routes
+import appSettingsRoutes from './routes/appSettings';
+app.use('/api/app-settings', appSettingsRoutes);
+
+// Countries routes
+import countriesRoutes from './routes/countries';
+app.use('/api/countries', countriesRoutes);
 
 // Visitors admin routes
 import visitorsRoutes from './routes/visitors';
@@ -212,8 +229,11 @@ app.use((req: express.Request, res: express.Response) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+
+  // Auto-seed countries table if empty
+  await autoSeedCountries();
 });
 

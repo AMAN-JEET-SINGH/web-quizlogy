@@ -58,44 +58,62 @@ function parsePrizePool(prizePoolJson: string): string[] {
   }
 }
 
+// Helper: strict priority question selection
+// Country-specific questions take priority over ALL questions.
+export function getApplicableQuestions(
+  questions: Array<{ _countries: string[]; [key: string]: any }>,
+  userCountry: string
+): typeof questions {
+  if (userCountry === 'ALL' || questions.length === 0) return questions;
+
+  // Priority 1: User-country questions exist → use ONLY those
+  const userSpecific = questions.filter(q => q._countries.includes(userCountry));
+  if (userSpecific.length > 0) return userSpecific;
+
+  // Priority 2: Fallback to ALL questions
+  const allGlobal = questions.filter(q => q._countries.includes('ALL'));
+  if (allGlobal.length > 0) return allGlobal;
+
+  // Priority 3: No applicable questions
+  return [];
+}
+
 // IMPORTANT: Specific routes must come before generic routes (/:id)
 // Get contest list - matches /api/contestList
 router.get('/contestList', async (req: Request, res: Response) => {
   console.log('📥 GET /api/contestList - Request received');
   try {
-    const { category, status, region } = req.query;
-    console.log('Query params:', { category, status, region });
-    
-    // Get client region from IP tracking middleware
-    const clientRegion = (req as any).clientRegion || 'ALL';
-    console.log('Client region from IP:', clientRegion);
-    
+    const { category, status } = req.query;
+    console.log('Query params:', { category, status });
+
+    // Determine user's country code
+    // Priority: query param > cf-ipcountry header > IP geo lookup
+    const queryCountry = req.query.country as string;
+    const cfCountry = req.headers['cf-ipcountry'] as string | undefined;
+    const ipCountry = (req as any).clientCountryCode as string | undefined;
+    const isAdminSession = !!(req.session as any)?.admin;
+    let userCountry = 'ALL';
+    if (queryCountry && queryCountry !== 'ALL') {
+      userCountry = queryCountry.toUpperCase();
+    } else if (cfCountry) {
+      userCountry = cfCountry.toUpperCase();
+    } else if (ipCountry && ipCountry !== 'ALL' && ipCountry !== 'UN') {
+      userCountry = ipCountry;
+    }
+    console.log('User country:', userCountry, 'isAdmin:', isAdminSession);
+
     const where: any = {};
-    
+
     if (category) {
       where.categoryId = category as string;
     }
-    
-    // Filter contests based on IP location
-    // If user is from India (IND), show IND and ALL contests
-    // If user is from other countries (ALL), only show ALL contests
-    if (clientRegion === 'IND') {
-      // Indian users can see both IND and ALL contests
-      where.region = { in: ['IND', 'ALL'] };
-    } else {
-      // Non-Indian users can only see ALL contests
-      where.region = 'ALL';
-    }
-    
-    // Override with explicit region filter if provided in query
-    if (region && region !== 'ALL') {
-      // Only allow filtering if user is from India
-      if (clientRegion === 'IND') {
-        where.region = region as string;
-      } else {
-        // Non-Indian users can't filter by IND region
-        where.region = 'ALL';
-      }
+
+    // Filter contests by user's country — skip for admin sessions
+    if (!isAdminSession && userCountry !== 'ALL') {
+      where.OR = [
+        { countries: { contains: '"ALL"' } },
+        { countries: { contains: `"${userCountry}"` } },
+      ];
     }
 
     const contests = await prisma.contest.findMany({
@@ -109,6 +127,7 @@ router.get('/contestList', async (req: Request, res: Response) => {
             imagePath: true,
           },
         },
+        questions: { select: { countries: true } },
       },
       orderBy: {
         createdAt: 'desc',
@@ -117,20 +136,24 @@ router.get('/contestList', async (req: Request, res: Response) => {
 
     // Transform contests to match expected format
     const now = new Date();
-    const transformedContests = contests.map((contest) => {
-      const contestStatus = contest.isDaily 
-        ? 'DAILY' 
+    let transformedContests = contests.map((contest) => {
+      const contestStatus = contest.isDaily
+        ? 'DAILY'
         : calculateStatus(
-            contest.startDate || new Date(), 
-            contest.endDate || new Date(), 
+            contest.startDate || new Date(),
+            contest.endDate || new Date(),
             contest.resultDate || new Date()
           );
-      
+
       // Filter by status if provided
       if (status && contestStatus !== status) {
         return null;
       }
-      
+
+      // Parse countries for deduplication
+      let parsedCountries: string[] = ['ALL'];
+      try { parsedCountries = JSON.parse(contest.countries); } catch {}
+
       return {
         id: contest.id,
         name: contest.name,
@@ -148,17 +171,61 @@ router.get('/contestList', async (req: Request, res: Response) => {
         isDaily: contest.isDaily || false,
         dailyStartTime: contest.dailyStartTime,
         dailyEndTime: contest.dailyEndTime,
+        _countries: parsedCountries, // internal field for deduplication
+        _questions: contest.questions.map((q: any) => {
+          let qc: string[] = ['ALL'];
+          try { qc = JSON.parse(q.countries); } catch {}
+          return { _countries: qc };
+        }),
       };
-    }).filter(Boolean);
+    }).filter(Boolean) as any[];
+
+    // Filter out contests with no applicable questions for this user
+    if (!isAdminSession && userCountry !== 'ALL') {
+      transformedContests = transformedContests.filter((c: any) =>
+        getApplicableQuestions(c._questions, userCountry).length > 0
+      );
+    }
+
+    // Deduplicate by contest name: if a country-specific contest exists
+    // with the same name as an ALL contest, the user sees only the
+    // country-specific one. Users from other countries see the ALL version.
+    let dedupedContests = transformedContests;
+    if (!isAdminSession && userCountry !== 'ALL') {
+      const byName = new Map<string, any[]>();
+      for (const c of transformedContests) {
+        const arr = byName.get(c.name) || [];
+        arr.push(c);
+        byName.set(c.name, arr);
+      }
+
+      dedupedContests = [];
+      for (const [, group] of byName) {
+        // Find contests that specifically target the user's country
+        const countrySpecific = group.filter((c: any) =>
+          c._countries.includes(userCountry) && !c._countries.includes('ALL')
+        );
+        if (countrySpecific.length > 0) {
+          // User's country has a dedicated version — show only that
+          dedupedContests.push(...countrySpecific);
+        } else {
+          // No country-specific version — show the ALL version(s)
+          dedupedContests.push(...group);
+        }
+      }
+    }
+
+    // Strip internal _countries and _questions fields before sending response
+    const finalContests = dedupedContests.map(({ _countries, _questions, ...rest }: any) => rest);
 
     // Get unique category IDs
     const categories = [...new Set(contests.map(c => c.categoryId))];
 
-    console.log(` Returning ${transformedContests.length} contests`);
+    console.log(` Returning ${finalContests.length} contests`);
     res.json({
       status: true,
-      data: transformedContests,
-      totalResults: transformedContests.length,
+      data: finalContests,
+      totalResults: finalContests.length,
       categories,
     });
   } catch (error: any) {
@@ -430,13 +497,48 @@ router.post('/contest/:id/submit', isAuthenticated, async (req: Request, res: Re
       return res.status(404).json({ error: 'Participation not found. Please join the contest first.' });
     }
 
+    // Calculate correct and wrong answers
+    const answersArray = answers || [];
+    const correctAnswers = answersArray.filter((a: any) => a.isCorrect === true).length;
+    const wrongAnswers = answersArray.filter((a: any) => a.isCorrect === false && a.selectedAnswer && a.selectedAnswer.trim().length > 0).length;
+    const totalQuestions = contest.questionCount || answersArray.length;
+
+    // Calculate time taken (sum of all answer timeTaken values)
+    const timeTaken = answersArray.reduce((total: number, a: any) => total + (a.timeTaken || 0), 0);
+
+    // Calculate winning coins: +10 per correct, -5 per wrong, minimum 0
+    const COINS_PER_CORRECT = 10;
+    const COINS_PER_WRONG = 5;
+    let winningAmount = (correctAnswers * COINS_PER_CORRECT) - (wrongAnswers * COINS_PER_WRONG);
+    winningAmount = Math.max(0, winningAmount); // Ensure never negative
+
     // Update participation with results
     participation = await prisma.contestParticipation.update({
       where: { id: participation.id },
       data: {
         score: score || 0,
-        answers: JSON.stringify(answers || []),
+        answers: JSON.stringify(answersArray),
         completedAt: new Date(),
+        coinsEarned: winningAmount,
+      },
+    });
+
+    // Create PENDING coin history entry (coins will be awarded when results are announced)
+    // Only for registered users (which is already ensured by isAuthenticated middleware)
+    await prisma.coinHistory.create({
+      data: {
+        userId,
+        amount: winningAmount,
+        type: 'EARNED',
+        status: 'PENDING', // Coins not yet awarded, waiting for result announcement
+        description: `Quiz completed: ${contest.name}`,
+        contestId,
+        contestName: contest.name,
+        correctAnswers,
+        wrongAnswers,
+        totalQuestions,
+        winningAmount,
+        timeTaken,
       },
     });
 
@@ -452,6 +554,7 @@ router.post('/contest/:id/submit', isAuthenticated, async (req: Request, res: Re
             id: true,
             name: true,
             email: true,
+            coins: true,
           },
         },
       },
@@ -459,8 +562,9 @@ router.post('/contest/:id/submit', isAuthenticated, async (req: Request, res: Re
 
     res.json({
       status: true,
-      message: 'Contest results submitted successfully',
+      message: 'Contest results submitted successfully. Coins will be awarded when results are announced.',
       data: updatedParticipation,
+      pendingCoins: winningAmount,
     });
   } catch (error: any) {
     console.error('Error submitting contest results:', error);
@@ -617,14 +721,33 @@ router.get('/contest/:id', async (req: Request, res: Response) => {
       alreadyPlayed = !!participation?.completedAt;
     }
 
-    // Transform questions and randomize them
-    let questions = contest.questions.map((q) => {
+    // Determine user's country code
+    // Priority: query param > cf-ipcountry header > IP geo lookup
+    const queryCountry = req.query.country as string;
+    const cfCountry = req.headers['cf-ipcountry'] as string | undefined;
+    const ipCountry = (req as any).clientCountryCode as string | undefined;
+    let userCountry = 'ALL';
+    if (queryCountry && queryCountry !== 'ALL') {
+      userCountry = queryCountry.toUpperCase();
+    } else if (cfCountry) {
+      userCountry = cfCountry.toUpperCase();
+    } else if (ipCountry && ipCountry !== 'ALL' && ipCountry !== 'UN') {
+      userCountry = ipCountry;
+    }
+
+    // Transform all questions
+    const allQuestions = contest.questions.map((q) => {
       let options: string[] = [];
       try {
         options = JSON.parse(q.options);
       } catch {
         options = [];
       }
+
+      let qCountries: string[] = ['ALL'];
+      try {
+        qCountries = JSON.parse(q.countries);
+      } catch {}
 
       return {
         id: q.id,
@@ -633,8 +756,27 @@ router.get('/contest/:id', async (req: Request, res: Response) => {
         media: q.media ? getImageUrl(q.media) : null,
         options,
         correctOption: q.correctOption,
+        _countries: qCountries, // internal, stripped later
       };
     });
+
+    // Strict priority question selection:
+    // Country-specific questions take precedence; fall back to ALL if none exist
+    let filtered = allQuestions as typeof allQuestions;
+    if (userCountry !== 'ALL') {
+      filtered = getApplicableQuestions(allQuestions, userCountry) as typeof allQuestions;
+    }
+
+    if (filtered.length === 0 && userCountry !== 'ALL') {
+      return res.status(404).json({
+        status: false,
+        error: 'No questions available for your region',
+      });
+    }
+
+    // Take up to questionCount questions
+    const questionLimit = contest.questionCount || filtered.length;
+    let questions = filtered.slice(0, questionLimit).map(({ _countries, ...rest }) => rest);
 
     // Shuffle questions array to randomize order (Fisher-Yates shuffle)
     for (let i = questions.length - 1; i > 0; i--) {
@@ -728,7 +870,24 @@ router.get('/contest/:id', async (req: Request, res: Response) => {
 router.get('/contests', async (req: Request, res: Response) => {
   console.log('📥 GET /api/contests - Request received');
   try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+    const search = req.query.search as string;
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Get total count for pagination
+    const total = await prisma.contest.count({ where });
+
     const contests = await prisma.contest.findMany({
+      where,
       include: {
         category: {
           select: {
@@ -740,17 +899,29 @@ router.get('/contests', async (req: Request, res: Response) => {
       orderBy: {
         createdAt: 'desc',
       },
+      skip,
+      take: limit,
     });
 
     const transformedContests = contests.map((contest) => ({
       ...contest,
       imageUrl: getImageUrl(contest.imagePath),
-      status: contest.isDaily 
-        ? 'DAILY' 
+      countries: (() => { try { return JSON.parse(contest.countries); } catch { return ['ALL']; } })(),
+      status: contest.isDaily
+        ? 'DAILY'
         : calculateStatus(contest.startDate || new Date(), contest.endDate || new Date(), contest.resultDate || new Date()),
     }));
 
-    res.json(transformedContests);
+    res.json({
+      status: true,
+      data: transformedContests,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error('Error fetching contests:', error);
     res.status(500).json({ error: 'Failed to fetch contests' });
@@ -781,8 +952,9 @@ router.get('/contests/:id', async (req: Request, res: Response) => {
     res.json({
       ...contest,
       imageUrl: getImageUrl(contest.imagePath),
-      status: contest.isDaily 
-        ? 'DAILY' 
+      countries: (() => { try { return JSON.parse(contest.countries); } catch { return ['ALL']; } })(),
+      status: contest.isDaily
+        ? 'DAILY'
         : calculateStatus(contest.startDate || new Date(), contest.endDate || new Date(), contest.resultDate || new Date()),
     });
   } catch (error) {
@@ -809,6 +981,7 @@ router.post('/contests', isAdmin, async (req: AdminRequest, res: Response) => {
       questionCount,
       duration,
       region,
+      countries,
       prizePool,
       marking,
       negativeMarking,
@@ -881,6 +1054,11 @@ router.post('/contests', isAdmin, async (req: AdminRequest, res: Response) => {
       ? (typeof prizePool === 'string' ? prizePool : JSON.stringify(prizePool))
       : JSON.stringify(["50000", "40000", "30000", "20000", "10000", "5000", "4000", "3000", "2000", "1000"]);
 
+    // Contest countries are always inherited from the category
+    let countriesJson = category.countries || '["ALL"]';
+    // Ensure it's valid JSON
+    try { JSON.parse(countriesJson); } catch { countriesJson = '["ALL"]'; }
+
     const contestData: any = {
       name,
       description: description || null,
@@ -890,7 +1068,8 @@ router.post('/contests', isAdmin, async (req: AdminRequest, res: Response) => {
       joiningFee: joiningFee !== undefined ? Math.max(0, parseInt(joiningFee.toString()) || 0) : 0,
       questionCount: questionCount || 10,
       duration: duration || 90,
-      region: region || 'ALL',
+      region: region || 'ALL', // Keep legacy field
+      countries: countriesJson,
       prizePool: finalPrizePool,
       marking: marking || 20,
       negativeMarking: negativeMarking || 5,
@@ -996,6 +1175,14 @@ router.put('/contests/:id', isAdmin, async (req: AdminRequest, res: Response) =>
     if (req.body.questionCount !== undefined) updateData.questionCount = req.body.questionCount;
     if (req.body.duration !== undefined) updateData.duration = req.body.duration;
     if (req.body.region) updateData.region = req.body.region;
+    // Contest countries are always inherited from the category
+    // If category is changing, use the new category; otherwise use the current one
+    const targetCategoryId = req.body.categoryId || contest.categoryId;
+    const targetCategory = await prisma.category.findUnique({ where: { id: targetCategoryId } });
+    if (targetCategory) {
+      updateData.countries = targetCategory.countries || '["ALL"]';
+      try { JSON.parse(updateData.countries); } catch { updateData.countries = '["ALL"]'; }
+    }
     if (req.body.prizePool) {
       updateData.prizePool = typeof req.body.prizePool === 'string' 
         ? req.body.prizePool 
@@ -1047,6 +1234,127 @@ router.delete('/contests/:id', isAdmin, async (req: AdminRequest, res: Response)
   } catch (error) {
     console.error('Error deleting contest:', error);
     res.status(500).json({ error: 'Failed to delete contest' });
+  }
+});
+
+// Announce contest results and award coins to all participants (admin only)
+router.post('/contests/:id/announce-results', isAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Get contest details
+    const contest = await prisma.contest.findUnique({
+      where: { id },
+    });
+
+    if (!contest) {
+      return res.status(404).json({ error: 'Contest not found' });
+    }
+
+    // Find all PENDING coin history entries for this contest
+    const pendingEntries = await prisma.coinHistory.findMany({
+      where: {
+        contestId: id,
+        status: 'PENDING',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (pendingEntries.length === 0) {
+      return res.json({
+        status: true,
+        message: 'No pending results to announce for this contest',
+        processedCount: 0,
+      });
+    }
+
+    // Process all pending entries in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      let processedCount = 0;
+      let totalCoinsAwarded = 0;
+
+      for (const entry of pendingEntries) {
+        // Award coins to the user
+        await tx.user.update({
+          where: { id: entry.userId },
+          data: {
+            coins: {
+              increment: entry.amount,
+            },
+          },
+        });
+
+        // Update coin history status to COMPLETED
+        await tx.coinHistory.update({
+          where: { id: entry.id },
+          data: {
+            status: 'COMPLETED',
+            description: `Coins awarded: ${contest.name}`,
+          },
+        });
+
+        processedCount++;
+        totalCoinsAwarded += entry.amount;
+      }
+
+      return { processedCount, totalCoinsAwarded };
+    });
+
+    res.json({
+      status: true,
+      message: `Results announced successfully! ${result.processedCount} participants received their coins.`,
+      processedCount: result.processedCount,
+      totalCoinsAwarded: result.totalCoinsAwarded,
+      contestName: contest.name,
+    });
+  } catch (error: any) {
+    console.error('Error announcing contest results:', error);
+    res.status(500).json({ error: 'Failed to announce contest results' });
+  }
+});
+
+// Get pending results for a contest (admin only)
+router.get('/contests/:id/pending-results', isAdmin, async (req: AdminRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const pendingEntries = await prisma.coinHistory.findMany({
+      where: {
+        contestId: id,
+        status: 'PENDING',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            picture: true,
+          },
+        },
+      },
+      orderBy: {
+        winningAmount: 'desc',
+      },
+    });
+
+    res.json({
+      status: true,
+      data: pendingEntries,
+      totalPending: pendingEntries.length,
+      totalPendingCoins: pendingEntries.reduce((sum, e) => sum + e.amount, 0),
+    });
+  } catch (error: any) {
+    console.error('Error fetching pending results:', error);
+    res.status(500).json({ error: 'Failed to fetch pending results' });
   }
 });
 

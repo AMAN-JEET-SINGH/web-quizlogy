@@ -109,15 +109,26 @@ export default function BattlesPage() {
 
           {/* Loading State */}
           {loading && (
-            <div className="text-center text-white py-12">
-              <p>Loading battles...</p>
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="relative mb-4">
+                <div className="w-12 h-12 rounded-full border-4 border-[#FFF6D9]/20 border-t-[#FFD602] animate-loading-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <img src="/logo.svg" alt="" className="w-5 h-5 opacity-90" />
+                </div>
+              </div>
+              <p className="text-[#FFF6D9] font-medium">Loading battles...</p>
             </div>
           )}
 
           {/* Error State */}
           {error && !loading && (
-            <div className="text-center text-white py-12">
-              <p>{error}</p>
+            <div className="text-center py-12">
+              <div className="mb-4">
+                <svg className="w-12 h-12 mx-auto text-[#FF6B6B] opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-[#FFF6D9] font-medium">{error}</p>
             </div>
           )}
 
@@ -125,8 +136,14 @@ export default function BattlesPage() {
           {!loading && !error && (
             <>
               {filteredBattles.length === 0 ? (
-                <div className="text-center text-white py-12">
-                  <p>No battles found. {searchQuery && 'Try a different search.'}</p>
+                <div className="text-center py-12">
+                  <div className="mb-4">
+                    <svg className="w-12 h-12 mx-auto text-[#FFD602] opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-[#FFF6D9] font-medium">No battles found.</p>
+                  {searchQuery && <p className="text-[#FFF6D9]/60 text-sm mt-1">Try a different search.</p>}
                 </div>
               ) : (
                 <div className="space-y-3 mb-6">

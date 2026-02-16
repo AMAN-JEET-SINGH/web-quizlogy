@@ -48,6 +48,17 @@ model UserProfile {
   @@map("user_profiles")
 }
 
+model Country {
+  code     String   @id // ISO 3166-1 alpha-2 (e.g. "IN", "US")
+  name     String
+  flagUrl  String?
+  isActive Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("countries")
+}
+
 model Category {
   id            String   @id @default(uuid())
   name          String   @unique
@@ -55,6 +66,7 @@ model Category {
   imagePath     String
   backgroundColor String? // Hex color code (e.g., "#FF5733")
   status        String   @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  countries     String   @default("[\"ALL\"]") // JSON array of country codes e.g. ["IN","PK"] or ["ALL"]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -70,7 +82,7 @@ model Contest {
   description String?
   imagePath   String
   categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   // Timing
   startDate  DateTime? // Optional for daily contests
@@ -86,7 +98,8 @@ model Contest {
   joiningFee    Int    @default(0) // in coins
   questionCount Int    @default(10)
   duration      Int    @default(90) // in seconds
-  region        String @default("ALL") // "IND" or "ALL" (rest of world)
+  region        String @default("ALL") // Legacy: "IND" or "ALL" — kept temporarily
+  countries     String @default("[\"ALL\"]") // JSON array of country codes e.g. ["IN","PK"] or ["ALL"]
 
   // Prize pool - stored as JSON string, will be parsed
   prizePool String @default("[\"50000\",\"40000\",\"30000\",\"20000\",\"10000\",\"5000\",\"4000\",\"3000\",\"2000\",\"1000\"]")
@@ -108,8 +121,8 @@ model Contest {
 
 model Question {
   id        String  @id @default(uuid())
-  contestId String
-  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  contestId String?
+  contest   Contest? @relation(fields: [contestId], references: [id], onDelete: SetNull)
 
   question String
   type     String  @default("NONE") // "NONE", "IMAGE", "VIDEO", "AUDIO"
@@ -118,6 +131,7 @@ model Question {
   // Options stored as JSON array
   options       String // JSON array of 4 options
   correctOption String // the correct option text
+  countries     String @default("[\"ALL\"]") // JSON array of country codes
 
   order Int // order of question in contest
 
@@ -169,7 +183,7 @@ model ContestParticipation {
   userId    String
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   contestId String
-  contest   Contest @relation(fields: [contestId], references: [id])
+  contest   Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
 
   score       Int       @default(0)
   rank        Int?
@@ -189,7 +203,7 @@ model QuestionReport {
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   questionId String
-  question   Question @relation(fields: [questionId], references: [id])
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   reason      String
   description String?
@@ -211,8 +225,18 @@ model CoinHistory {
   type        String // "EARNED", "SPENT", "REFUND", "LOGIN"
   description String
   contestId   String?
+  status      String  @default("COMPLETED") // "PENDING", "COMPLETED" - PENDING means waiting for contest results
+
+  // Contest result details (for quiz completion entries)
+  contestName     String?
+  correctAnswers  Int?
+  wrongAnswers    Int?
+  totalQuestions  Int?
+  winningAmount   Int?     // The calculated winning based on prize pool
+  timeTaken       Int?     // Total time taken in seconds
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("coin_history")
 }
@@ -291,7 +315,8 @@ model TwoQuestion {
   options   String   // JSON array of 4 options
   correctOption String // the correct option text
   status    String   @default("ACTIVE") // "ACTIVE" or "INACTIVE"
-  region   String   @default("ALL") // "IND" or "ALL" - which country/region sees this on intro page (same as Contest)
+  region   String   @default("ALL") // Legacy: "IND" or "ALL" — kept temporarily
+  countries String  @default("[\"ALL\"]") // JSON array of country codes e.g. ["IN"] or ["ALL"]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -345,4 +370,90 @@ model ContactMessage {
   updatedAt DateTime @updatedAt
 
   @@map("contact_messages")
+}
+
+model AdminUser {
+  id                      String   @id @default(uuid())
+  username                String   @unique
+  passwordHash            String
+  isSuperAdmin            Boolean  @default(false)
+  allowedSections         String   @default("[]")  // JSON array: ["dashboard", "adsense"]
+  adsenseAllowedDomains   String   @default("[]")  // JSON array, empty = all
+  adsenseAllowedCountries String   @default("[]")  // JSON array, empty = all
+  adsenseRevenueShare     Float    @default(100)   // 0-100 percentage
+  adsenseDomainDeductions String   @default("{}")  // JSON: {"domain.com": 20}
+  adsenseInHandRevenue    Float    @default(0)     // Pre-set in-hand revenue amount for this admin
+  webAppLinks             String   @default("[]")  // JSON array: [{"label":"Website","url":"https://..."}]
+  isActive                Boolean  @default(true)
+  lastLogin               DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  createdBy               String?
+
+  @@map("admin_users")
+}
+
+model AppSettings {
+  id                    String   @id @default("global")
+  revenueDeductPercent  Float    @default(0)  // 0-100
+  updatedAt             DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+model AdsenseData {
+  id              String   @id @default(uuid())
+  date            String   // YYYY-MM-DD format
+  domainName      String
+  countryName     String
+  pageViews       Int      @default(0)
+  pageViewsRpm    Float    @default(0)
+  impressions     Int      @default(0)
+  impressionsRpm  Float    @default(0)
+  clicks          Int      @default(0)
+  earnings        Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([date, domainName, countryName])
+  @@index([date])
+  @@map("adsense_data")
+}
+
+model AdsenseSyncLog {
+  id          String   @id @default(uuid())
+  syncType    String   // "auto" | "manual"
+  startDate   String   // Date range start
+  endDate     String   // Date range end
+  rowsCount   Int      @default(0)
+  status      String   @default("success") // "success" | "error"
+  errorMsg    String?
+  createdAt   DateTime @default(now())
+
+  @@map("adsense_sync_logs")
+}
+
+model InvoiceRequest {
+  id            String   @id @default(uuid())
+  adminId       String
+  adminUsername String
+  monthKey      String   // "2025-12"
+  monthName     String   // "December-2025"
+  carryforward  Float    @default(0)
+  grossEarnings Float    @default(0)
+  deductions    Float    @default(0)
+  netEarnings   Float    @default(0)
+  totalUSD      Float    @default(0)
+  totalINR      Float    @default(0)
+  status        String   @default("pending") // "pending" | "approved" | "rejected"
+  rejectionNote String?
+  filePath      String?  // Path to uploaded invoice file (e.g., "uploads/invoices/file.pdf")
+  requestedAt   DateTime @default(now())
+  processedAt   DateTime?
+  processedBy   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([adminId, monthKey])
+  @@map("invoice_requests")
 }

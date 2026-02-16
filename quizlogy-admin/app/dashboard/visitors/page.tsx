@@ -25,6 +25,8 @@ export default function VisitorsManagement() {
   const [browser, setBrowser] = useState('');
   const [selectedOrigins, setSelectedOrigins] = useState<string[]>([]);
   const [showOriginFilter, setShowOriginFilter] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState('lastVisit');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
@@ -95,11 +97,13 @@ export default function VisitorsManagement() {
     fetchTrafficSources();
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchVisitors();
     fetchStats();
     fetchCountries();
-  }, [page, search, country, region, deviceType, os, browser, sortBy, sortOrder, selectedOrigins]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, country, region, deviceType, os, browser, sortBy, sortOrder, selectedOrigins, dateFrom, dateTo]);
 
   const fetchVisitors = async () => {
     try {
@@ -114,6 +118,8 @@ export default function VisitorsManagement() {
         os: os || undefined,
         browser: browser || undefined,
         origins: selectedOrigins.length > 0 ? selectedOrigins : undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
         sortBy,
         sortOrder,
       });
@@ -193,6 +199,8 @@ export default function VisitorsManagement() {
     setOs('');
     setBrowser('');
     setSelectedOrigins([]);
+    setDateFrom('');
+    setDateTo('');
     setPage(1);
   };
 
@@ -214,7 +222,7 @@ export default function VisitorsManagement() {
     setPage(1);
   };
 
-  const hasActiveFilters = search || country || region || deviceType || os || browser || selectedOrigins.length > 0;
+  const hasActiveFilters = search || country || region || deviceType || os || browser || selectedOrigins.length > 0 || dateFrom || dateTo;
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A';
@@ -629,6 +637,31 @@ export default function VisitorsManagement() {
               setPage(1);
             }}
             className="filter-input"
+          />
+        </div>
+        <div className="filter-group visitor-date-filter-group">
+          <label className="visitor-date-label">From</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => {
+              setDateFrom(e.target.value);
+              setPage(1);
+            }}
+            className="filter-input visitor-date-input"
+          />
+        </div>
+        <div className="filter-group visitor-date-filter-group">
+          <label className="visitor-date-label">To</label>
+          <input
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            onChange={(e) => {
+              setDateTo(e.target.value);
+              setPage(1);
+            }}
+            className="filter-input visitor-date-input"
           />
         </div>
         <div className="filter-group origin-filter-wrapper" ref={originFilterRef}>

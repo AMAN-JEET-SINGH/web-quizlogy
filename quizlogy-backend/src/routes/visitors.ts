@@ -16,6 +16,8 @@ router.get('/', isAdmin, async (req: AdminRequest, res: Response) => {
       deviceType,
       os,
       browser,
+      dateFrom,
+      dateTo,
       sortBy = 'lastVisit',
       sortOrder = 'desc',
     } = req.query;
@@ -58,6 +60,20 @@ router.get('/', isAdmin, async (req: AdminRequest, res: Response) => {
 
     if (browser) {
       where.browser = { contains: browser as string, mode: 'insensitive' };
+    }
+
+    // Date range filter on lastVisit
+    if (dateFrom || dateTo) {
+      where.lastVisit = {};
+      if (dateFrom) {
+        where.lastVisit.gte = new Date(dateFrom as string);
+      }
+      if (dateTo) {
+        // Include the entire "dateTo" day by setting time to end of day
+        const endDate = new Date(dateTo as string);
+        endDate.setHours(23, 59, 59, 999);
+        where.lastVisit.lte = endDate;
+      }
     }
 
     // Multiple origins filter: comma-separated or array (e.g. "Direct,https://a.com" or ["Direct","https://a.com"])

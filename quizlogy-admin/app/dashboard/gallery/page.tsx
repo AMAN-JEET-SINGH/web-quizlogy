@@ -16,6 +16,7 @@ export default function GalleryManagementPage() {
 
   useEffect(() => {
     fetchImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType]);
 
   const fetchImages = async () => {
@@ -176,8 +177,9 @@ export default function GalleryManagementPage() {
               onClick={() => setSelectedImage(image)}
             >
               <div className="card-image-container">
-                <img 
-                  src={image.url} 
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.url}
                   alt={image.filename}
                   onError={(e) => {
                     console.error('Image failed to load:', image.url);
@@ -240,8 +242,9 @@ export default function GalleryManagementPage() {
             
             <div className="preview-content">
               <div className="preview-image-container">
-                <img 
-                  src={selectedImage.url} 
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={selectedImage.url}
                   alt={selectedImage.filename}
                   onError={(e) => {
                     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { isAuthenticated, AuthRequest } from '../middleware/auth';
 import { isAdmin, AdminRequest } from '../middleware/adminAuth';
 import prisma from '../config/database';
+import { getApplicableQuestions } from './contests';
 
 const router = express.Router();
 
@@ -46,7 +47,21 @@ router.get('/getContestCategories', async (req: Request, res: Response) => {
   try {
     const { status, page = '1', limit = '10' } = req.query;
     console.log('Query params:', { status, page, limit });
-    
+
+    // Determine user's country code
+    const queryCountry = req.query.country as string;
+    const cfCountry = req.headers['cf-ipcountry'] as string | undefined;
+    const ipCountry = (req as any).clientCountryCode as string | undefined;
+    const isAdminSession = !!(req.session as any)?.admin;
+    let userCountry = 'ALL';
+    if (queryCountry && queryCountry !== 'ALL') {
+      userCountry = queryCountry.toUpperCase();
+    } else if (cfCountry) {
+      userCountry = cfCountry.toUpperCase();
+    } else if (ipCountry && ipCountry !== 'ALL' && ipCountry !== 'UN') {
+      userCountry = ipCountry;
+    }
+
     const where: any = {};
     if (status === 'ACTIVE' || status === 'INACTIVE') {
       where.status = status;
@@ -54,29 +69,69 @@ router.get('/getContestCategories', async (req: Request, res: Response) => {
       where.status = 'ACTIVE'; // Default to active
     }
 
+    // Filter by user's country — skip for admin sessions
+    if (!isAdminSession && userCountry !== 'ALL') {
+      where.OR = [
+        { countries: { contains: '"ALL"' } },
+        { countries: { contains: `"${userCountry}"` } },
+      ];
+    }
+
     const pageNum = parseInt(page as string) || 1;
     const limitNum = parseInt(limit as string) || 10;
     const skip = (pageNum - 1) * limitNum;
 
-    const [categories, total] = await Promise.all([
-      prisma.category.findMany({
-        where,
-        skip,
-        take: limitNum,
-        orderBy: {
-          createdAt: 'desc',
+    const categories = await prisma.category.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        contests: {
+          select: {
+            countries: true,
+            questions: { select: { countries: true } },
+          },
         },
-      }),
-      prisma.category.count({ where }),
-    ]);
+      },
+    });
 
-    // Transform to match expected format
-    const results = categories.map((category) => ({
+    // Filter categories: always keep "ALL" categories visible;
+    // only hide country-specific categories if they have no applicable contests/questions
+    let filtered = categories;
+    if (!isAdminSession && userCountry !== 'ALL') {
+      filtered = categories.filter(cat => {
+        // "ALL" categories are always shown
+        let catCountries: string[] = ['ALL'];
+        try { catCountries = JSON.parse(cat.countries); } catch {}
+        if (catCountries.includes('ALL')) return true;
+
+        // Country-specific categories: check if they have applicable contests
+        return cat.contests.some((contest: any) => {
+          let cc: string[] = ['ALL'];
+          try { cc = JSON.parse(contest.countries); } catch {}
+          if (!cc.includes('ALL') && !cc.includes(userCountry)) return false;
+
+          const qs = contest.questions.map((q: any) => {
+            let qc: string[] = ['ALL'];
+            try { qc = JSON.parse(q.countries); } catch {}
+            return { _countries: qc };
+          });
+          return getApplicableQuestions(qs, userCountry).length > 0;
+        });
+      });
+    }
+
+    // Apply pagination manually on the filtered array
+    const total = filtered.length;
+    const paged = filtered.slice(skip, skip + limitNum);
+
+    // Transform to match expected format (strip contests from output)
+    const results = paged.map(({ contests, ...category }) => ({
       id: category.id,
       name: category.name,
       description: category.description || '',
       image: category.imagePath.split('/').pop() || category.imagePath, // Just filename
       status: category.status,
+      countries: (() => { try { return JSON.parse(category.countries); } catch { return ['ALL']; } })(),
     }));
 
     console.log(`✅ Returning ${results.length} categories`);
@@ -98,39 +153,84 @@ router.get('/getContestCategories', async (req: Request, res: Response) => {
   }
 });
 
-// Get all categories - /api/categories (specific path to avoid conflicts)
+// Get all categories - /api/categories
 router.get('/categories', async (req: Request, res: Response) => {
   console.log('📥 GET /api/categories - Request received');
   try {
     const { status } = req.query;
-    
+
+    // Determine user's country code
+    const queryCountry = req.query.country as string;
+    const cfCountry = req.headers['cf-ipcountry'] as string | undefined;
+    const ipCountry = (req as any).clientCountryCode as string | undefined;
+    let userCountry = 'ALL';
+    if (queryCountry && queryCountry !== 'ALL') {
+      userCountry = queryCountry.toUpperCase();
+    } else if (cfCountry) {
+      userCountry = cfCountry.toUpperCase();
+    } else if (ipCountry && ipCountry !== 'ALL' && ipCountry !== 'UN') {
+      userCountry = ipCountry;
+    }
+
     const where: any = {};
     if (status === 'ACTIVE' || status === 'INACTIVE') {
       where.status = status;
     }
 
+    // Filter by user's country (skip if country unknown)
+    if (userCountry !== 'ALL') {
+      where.OR = [
+        { countries: { contains: '"ALL"' } },
+        { countries: { contains: `"${userCountry}"` } },
+      ];
+    }
+
     const categories = await prisma.category.findMany({
       where,
-      orderBy: {
-        createdAt: 'desc',
+      orderBy: { createdAt: 'desc' },
+      include: {
+        contests: {
+          select: {
+            countries: true,
+            questions: { select: { countries: true } },
+          },
+        },
       },
     });
 
-    // Transform image paths based on environment
-    const transformedCategories = categories.map((category) => {
-      console.log(' Category image data:', {
-        id: category.id,
-        name: category.name,
-        imagePath: category.imagePath,
-        imagePathType: typeof category.imagePath,
-        imagePathLength: category.imagePath?.length,
-        imagePathValue: JSON.stringify(category.imagePath),
+    // Filter categories: always keep "ALL" categories visible;
+    // only hide country-specific categories if they have no applicable contests/questions
+    let filtered = categories;
+    if (userCountry !== 'ALL') {
+      filtered = categories.filter(cat => {
+        // "ALL" categories are always shown
+        let catCountries: string[] = ['ALL'];
+        try { catCountries = JSON.parse(cat.countries); } catch {}
+        if (catCountries.includes('ALL')) return true;
+
+        // Country-specific categories: check if they have applicable contests
+        return cat.contests.some((contest: any) => {
+          let cc: string[] = ['ALL'];
+          try { cc = JSON.parse(contest.countries); } catch {}
+          if (!cc.includes('ALL') && !cc.includes(userCountry)) return false;
+
+          const qs = contest.questions.map((q: any) => {
+            let qc: string[] = ['ALL'];
+            try { qc = JSON.parse(q.countries); } catch {}
+            return { _countries: qc };
+          });
+          return getApplicableQuestions(qs, userCountry).length > 0;
+        });
       });
+    }
+
+    // Transform image paths based on environment (strip contests from output)
+    const transformedCategories = filtered.map(({ contests, ...category }) => {
       const imageUrl = getImageUrl(category.imagePath);
-      console.log(' Generated imageUrl:', imageUrl);
       return {
         ...category,
         imageUrl,
+        countries: (() => { try { return JSON.parse(category.countries); } catch { return ['ALL']; } })(),
       };
     });
 
@@ -155,6 +255,7 @@ router.get('/categories/:id', async (req: Request, res: Response) => {
     res.json({
       ...category,
       imageUrl: getImageUrl(category.imagePath),
+      countries: (() => { try { return JSON.parse(category.countries); } catch { return ['ALL']; } })(),
     });
   } catch (error) {
     console.error('Error fetching category:', error);
@@ -171,7 +272,7 @@ router.post('/categories', isAdmin, async (req: AdminRequest, res: Response) => 
       isAdmin: !!(req.session as any)?.admin,
     });
 
-    const { name, description, imagePath, backgroundColor, status } = req.body;
+    const { name, description, imagePath, backgroundColor, status, countries } = req.body;
 
     // Validation
     if (!name) {
@@ -197,12 +298,18 @@ router.post('/categories', isAdmin, async (req: AdminRequest, res: Response) => 
       validStatus = statusUpper === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
     }
 
+    // Validate countries array
+    const countriesJson = Array.isArray(countries) && countries.length > 0
+      ? JSON.stringify(countries.map((c: string) => c.toUpperCase()))
+      : '["ALL"]';
+
     console.log('🔍 Category data:', {
       name,
       description,
       imagePath: finalImagePath,
       backgroundColor: validBackgroundColor,
       status: validStatus,
+      countries: countriesJson,
     });
 
     // Check if category name already exists
@@ -222,6 +329,7 @@ router.post('/categories', isAdmin, async (req: AdminRequest, res: Response) => 
         imagePath: finalImagePath,
         backgroundColor: validBackgroundColor,
         status: validStatus,
+        countries: countriesJson,
       },
     });
 
@@ -229,6 +337,7 @@ router.post('/categories', isAdmin, async (req: AdminRequest, res: Response) => 
     res.status(201).json({
       ...category,
       imageUrl: getImageUrl(category.imagePath),
+      countries: (() => { try { return JSON.parse(category.countries); } catch { return ['ALL']; } })(),
     });
   } catch (error) {
     console.error(' Error creating category:', error);
@@ -246,7 +355,7 @@ router.post('/categories', isAdmin, async (req: AdminRequest, res: Response) => 
 // Update category (admin only) - /api/categories/:id
 router.put('/categories/:id', isAdmin, async (req: AdminRequest, res: Response) => {
   try {
-    const { name, description, imagePath, backgroundColor, status } = req.body;
+    const { name, description, imagePath, backgroundColor, status, countries } = req.body;
     const { id } = req.params;
 
     const category = await prisma.category.findUnique({
@@ -269,6 +378,14 @@ router.put('/categories/:id', isAdmin, async (req: AdminRequest, res: Response) 
       validBackgroundColor = null; // Invalid color, set to null
     }
 
+    // Validate countries array if provided
+    let countriesJson: string | undefined;
+    if (countries !== undefined) {
+      countriesJson = Array.isArray(countries) && countries.length > 0
+        ? JSON.stringify(countries.map((c: string) => c.toUpperCase()))
+        : '["ALL"]';
+    }
+
     // Check if name is being changed and if it conflicts with existing category
     if (name && name !== category.name) {
       const existingCategory = await prisma.category.findUnique({
@@ -288,12 +405,14 @@ router.put('/categories/:id', isAdmin, async (req: AdminRequest, res: Response) 
         ...(imagePath && { imagePath }),
         ...(backgroundColor !== undefined && { backgroundColor: validBackgroundColor }),
         ...(status !== undefined && { status: validStatus }),
+        ...(countriesJson !== undefined && { countries: countriesJson }),
       },
     });
 
     res.json({
       ...updatedCategory,
       imageUrl: getImageUrl(updatedCategory.imagePath),
+      countries: (() => { try { return JSON.parse(updatedCategory.countries); } catch { return ['ALL']; } })(),
     });
   } catch (error) {
     console.error('Error updating category:', error);
@@ -305,23 +424,31 @@ router.put('/categories/:id', isAdmin, async (req: AdminRequest, res: Response) 
 });
 
 // Delete category (admin only) - /api/categories/:id
+// Deletes the category and its contests. Questions are kept (contestId set to null).
 router.delete('/categories/:id', isAdmin, async (req: AdminRequest, res: Response) => {
   try {
     const { id } = req.params;
 
     const category = await prisma.category.findUnique({
       where: { id },
+      include: { contests: { select: { id: true } } },
     });
 
     if (!category) {
       return res.status(404).json({ error: 'Category not found' });
     }
 
+    const contestCount = category.contests.length;
+
+    // Delete category — cascades to contests (which cascade-delete participations
+    // and set-null on questions, preserving them).
     await prisma.category.delete({
       where: { id },
     });
 
-    res.json({ message: 'Category deleted successfully' });
+    res.json({
+      message: `Category deleted successfully. ${contestCount} contest(s) removed. Questions have been preserved.`,
+    });
   } catch (error) {
     console.error('Error deleting category:', error);
     res.status(500).json({ error: 'Failed to delete category' });
@@ -351,6 +478,7 @@ router.patch('/:id/toggle-status', isAdmin, async (req: AdminRequest, res: Respo
     res.json({
       ...updatedCategory,
       imageUrl: getImageUrl(updatedCategory.imagePath),
+      countries: (() => { try { return JSON.parse(updatedCategory.countries); } catch { return ['ALL']; } })(),
     });
   } catch (error) {
     console.error('Error toggling category status:', error);

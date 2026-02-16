@@ -261,8 +261,15 @@ export default function CustomQuizPage() {
     return (
       <>
         <DashboardNav />
-        <div className="min-h-screen bg-[#1A0F3D] flex items-center justify-center">
-          <div className="text-white text-xl">Loading questions...</div>
+        <div className="min-h-screen bg-[#0D0009] flex flex-col items-center justify-center px-4">
+          <div className="relative mb-6">
+            <div className="w-14 h-14 rounded-full border-4 border-[#FFF6D9]/20 border-t-[#FFD602] animate-loading-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src="/logo.svg" alt="" className="w-6 h-6 opacity-90" />
+            </div>
+          </div>
+          <p className="text-[#FFF6D9] text-lg font-medium">Loading questions...</p>
+          <p className="text-[#FFD602] text-sm mt-1 font-semibold animate-loading-dots">...</p>
         </div>
         <Footer />
       </>
@@ -273,12 +280,19 @@ export default function CustomQuizPage() {
     return (
       <>
         <DashboardNav />
-        <div className="min-h-screen bg-[#1A0F3D] flex items-center justify-center p-5">
+        <div className="min-h-screen bg-[#0D0009] flex items-center justify-center p-5">
           <div className="text-center">
-            <div className="text-red-400 text-xl mb-4">No questions available</div>
+            <div className="mb-6">
+              <svg className="w-16 h-16 mx-auto text-[#FFD602] opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-[#FFF6D9] text-lg mb-2 font-semibold">No Questions Available</p>
+            <p className="text-[#FFF6D9]/70 text-sm mb-6">Please try again later.</p>
             <button
               onClick={() => router.push('/dashboard')}
-              className="bg-yellow-400 text-[#392C6E] px-6 py-3 rounded-xl font-bold hover:bg-yellow-500 relative overflow-hidden"
+              className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-[#0D0009] px-6 py-3 rounded-xl font-bold hover:from-yellow-500 hover:to-yellow-600 transition-all transform hover:scale-105 shadow-lg relative overflow-hidden"
+              style={{ boxShadow: '0 4px 15px rgba(255, 215, 0, 0.3)' }}
             >
               <span className="relative z-10">Go Back to Dashboard</span>
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent shiny-effect"></span>
@@ -293,11 +307,11 @@ export default function CustomQuizPage() {
   if (quizCompleted) {
     const correctCount = answers.filter(a => a.isCorrect).length;
     const wrongCount = answers.filter(a => !a.isCorrect && a.selectedAnswer !== null).length;
-    
+
     return (
       <>
         <DashboardNav />
-        <div className="min-h-screen bg-[#1A0F3D] p-5 pb-20">
+        <div className="min-h-screen bg-[#0D0009] p-5 pb-20">
           <div className="max-w-md mx-auto">
             {/* Header */}
             <div className="text-center mb-6">

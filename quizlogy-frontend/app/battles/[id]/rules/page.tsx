@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { DashboardNav } from '@/components/DashboardNav';
 import { Footer } from '@/components/Footer';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { SEOHead } from '@/components/SEOHead';
 import { battlesApi, Battle, authApi, User } from '@/lib/api';
 import { getImageUrl } from '@/lib/api';
@@ -68,9 +69,7 @@ export default function BattleRulesPage() {
         <SEOHead title="Loading Battle Rules..." description="Loading battle rules..." />
         <div className="min-h-screen bg-[#0D0009]">
           <DashboardNav />
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <p className="text-white">Loading...</p>
-          </div>
+          <LoadingScreen message="Loading battle rules..." fullPage />
           <Footer />
         </div>
       </>
@@ -93,7 +92,7 @@ export default function BattleRulesPage() {
       />
       <DashboardNav />
       <div className="min-h-screen bg-[#0D0009]">
-        <div className="container mx-auto px-4 sm:px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4 pb-4 mb-20">
           {/* Main Banner Card with bg-battle.svg */}
           <div className="battle-rules-banner relative rounded-2xl overflow-hidden mb-4" style={{ minHeight: '280px' }}>
             <div
@@ -192,13 +191,15 @@ export default function BattleRulesPage() {
             </div>
           </div>
 
-          {/* Play Battle Button */}
-          <button
-            onClick={handlePlayBattle}
-            className="w-full bg-[#FFD602] text-[#0D0009] font-bold py-4 rounded-xl hover:bg-[#FFE033] transition-colors text-lg sm:text-xl mb-6 shadow-lg"
-          >
-            Play Battle
-          </button>
+          {/* Play Battle Button - sticky at bottom of screen until footer is in view */}
+          <div className="sticky bottom-0 left-0 right-0 z-20 pt-3 pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 bg-[#0D0009] border-t border-[#FFF6D9]/10">
+            <button
+              onClick={handlePlayBattle}
+              className="w-full max-w-md mx-auto block bg-[#FFD602] text-[#0D0009] font-bold py-4 rounded-xl hover:bg-[#FFE033] transition-colors text-lg sm:text-xl shadow-lg"
+            >
+              Play Battle
+            </button>
+          </div>
         </div>
 
         <Footer />

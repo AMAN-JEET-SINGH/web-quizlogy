@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardNav } from '@/components/DashboardNav';
 import { Footer } from '@/components/Footer';
 import { SEOHead } from '@/components/SEOHead';
-import { questionsApi, Question } from '@/lib/api';
+import { questionsApi, Question, contestsApi, Contest } from '@/lib/api';
+import { isDailyContest, isDailyContestLive } from '@/lib/dailyContestUtils';
+import { ContestCard } from '@/components/ContestCard';
 import AdsenseAd from '@/components/AdsenseAd';
 import './custom-contest.css';
 
@@ -35,8 +37,59 @@ export default function CustomContestPage() {
   const [score, setScore] = useState(0);
   const [questionKey, setQuestionKey] = useState(0); // For triggering animations on question change
   const [isMuted, setIsMuted] = useState(false);
+  const [contests, setContests] = useState<Contest[]>([]);
+  const [contestsLoading, setContestsLoading] = useState(false);
+    const [animatedScore, setAnimatedScore] = useState(0);
+  const [animatedCoins, setAnimatedCoins] = useState(0);
+  const [animatedCorrect, setAnimatedCorrect] = useState(0);
+  const [animatedWrong, setAnimatedWrong] = useState(0);
   const questionScrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Animate number counting
+  const animateNumber = useCallback((start: number, end: number, duration: number, setter: (n: number) => void) => {
+    const startTime = Date.now();
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Easing function for smooth animation
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(start + (end - start) * easeOut);
+      setter(current);
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, []);
+
+  // Fetch other contests for the "More Contests" section
+  const fetchContests = useCallback(async () => {
+    try {
+      setContestsLoading(true);
+      const response = await contestsApi.getList();
+      const contests = response.data || [];
+
+      // Filter for LIVE contests (daily in their time window, or regular between start and end)
+      const now = new Date();
+      const liveContests = contests.filter((contest: any) => {
+        if (isDailyContest(contest)) {
+          return isDailyContestLive(contest.dailyStartTime, contest.dailyEndTime);
+        }
+        if (!contest.startDate || !contest.endDate) return false;
+        const start = new Date(contest.startDate);
+        const end = new Date(contest.endDate);
+        return now >= start && now <= end;
+      });
+
+      // Take up to 5 live contests (or 0 if none available)
+      setContests(liveContests.slice(0, 5));
+    } catch (err) {
+      console.error('Error fetching contests:', err);
+    } finally {
+      setContestsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const categoryNames = sessionStorage.getItem('customContestCategories');
@@ -56,6 +109,25 @@ export default function CustomContestPage() {
       }
     }
   }, [currentQuestionIndex, quizStarted]);
+
+  // Trigger animations and fetch contests when quiz completes
+  useEffect(() => {
+    if (quizCompleted) {
+      const correctCount = answers.filter(a => a.isCorrect).length;
+      const wrongCount = answers.filter(a => !a.isCorrect && a.selectedAnswer).length;
+      const totalQuestions = questions.length;
+      const coinsAwarded = Math.floor((correctCount / totalQuestions) * 200);
+
+      // Animate numbers with staggered timing
+      setTimeout(() => animateNumber(0, score, 800, setAnimatedScore), 200);
+      setTimeout(() => animateNumber(0, coinsAwarded, 800, setAnimatedCoins), 400);
+      setTimeout(() => animateNumber(0, correctCount, 600, setAnimatedCorrect), 600);
+      setTimeout(() => animateNumber(0, wrongCount, 600, setAnimatedWrong), 800);
+
+      // Fetch contests for "More Contests" section
+      fetchContests();
+    }
+  }, [quizCompleted, answers, questions.length, score, animateNumber, fetchContests]);
 
   // Timer for entire contest (skip for timeless mode)
   useEffect(() => {
@@ -284,10 +356,15 @@ export default function CustomContestPage() {
     return (
       <>
         <DashboardNav />
-        <div className="min-h-fit bg-[#0D0009] flex items-center justify-center" style={{
-          boxShadow: '0px 0px 2px 0px #FFF6D9'
-        }}>
-          <div className="text-[#FFF6D9] text-xl">Loading...</div>
+        <div className="min-h-screen bg-[#0D0009] flex flex-col items-center justify-center px-4">
+          <div className="relative mb-6">
+            <div className="w-14 h-14 rounded-full border-4 border-[#FFF6D9]/20 border-t-[#FFD602] animate-loading-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src="/logo.svg" alt="" className="w-6 h-6 opacity-90" />
+            </div>
+          </div>
+          <p className="text-[#FFF6D9] text-lg font-medium">Loading...</p>
+          <p className="text-[#FFD602] text-sm mt-1 font-semibold animate-loading-dots">...</p>
         </div>
         <Footer />
       </>
@@ -298,11 +375,15 @@ export default function CustomContestPage() {
     return (
       <>
         <DashboardNav />
-        <div className="min-h-fit bg-[#0D0009] flex items-center justify-center p-5" style={{
-          boxShadow: '0px 0px 2px 0px #FFF6D9'
-        }}>
+        <div className="min-h-screen bg-[#0D0009] flex items-center justify-center p-5">
           <div className="text-center">
-            <div className="text-red-400 text-xl mb-4">{error}</div>
+            <div className="mb-6">
+              <svg className="w-16 h-16 mx-auto text-[#FF6B6B] opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p className="text-[#FFF6D9] text-lg mb-2 font-semibold">Something went wrong</p>
+            <p className="text-[#FFF6D9]/70 text-sm mb-6">{error}</p>
             <button
               onClick={() => router.push('/dashboard')}
               className="bg-[#FFF6D9] text-[#0D0009] px-6 py-3 rounded-xl font-bold hover:bg-[#FFF6D9]/90 relative overflow-hidden"
@@ -459,95 +540,194 @@ export default function CustomContestPage() {
           <source src="/background-music.ogg" type="audio/ogg" />
           Your browser does not support the audio element.
         </audio>
-        
-        <div className="min-h-fit bg-[#0D0009] px-5 pt-5 pb-0" style={{
-        }}>
+
+        <div className="min-h-fit bg-[#0D0009] px-5 pt-5 pb-0">
           <div className="max-w-md mx-auto">
-            {/* Header */}
-            <div className="text-center mb-0">
+            {/* Header with animated coins */}
+            <div className="text-center mb-4 animate-slide-in-down">
               <p className="text-[#FFF6D9] text-sm mb-1">Custom Contest</p>
-              <h1 className="text-[#FFF6D9] text-2xl font-bold mb-2">Play And Win</h1>
+              <h1 className="text-[#FFF6D9] text-2xl font-bold mb-2">Results</h1>
               <div className="flex items-center justify-center gap-2">
-                <img src="/coin2.svg" alt="Coins" className="w-5 h-5" />
-                <span className="text-[#FFF6D9] font-bold text-lg">{coinsAwarded.toLocaleString()} COINS</span>
+                <img src="/coin2.svg" alt="Coins" className="w-6 h-6 animate-coin-spin" />
+                <span className="text-[#FFD700] font-bold text-xl animate-glow-pulse" style={{ textShadow: '0 0 10px rgba(255, 215, 0, 0.5)' }}>
+                  {animatedCoins.toLocaleString()} COINS
+                </span>
               </div>
             </div>
 
-            {/* Results Card */}
-            <div className="bg-[#FFF6D9] rounded-xl p-8 text-center mb-4 border border-[#BFBAA7]" style={{
-              boxShadow: '0px 0px 2px 0px #FFF6D9'
+            {/* Results Card with enhanced animations */}
+            <div className="bg-gradient-to-b from-[#FFF6D9] to-[#F5E6C8] rounded-2xl p-6 text-center mb-4 border border-[#BFBAA7] animate-result-card-slide relative overflow-hidden" style={{
+              boxShadow: '0px 4px 20px rgba(255, 215, 0, 0.3), 0px 0px 2px 0px #FFF6D9'
             }}>
-              {/* Trophy */}
-              <div className="relative mb-6 flex justify-center items-start">
-                <div className="flex justify-center">
-                  <img src="/trophy.svg" alt="Trophy" className="w-24 h-24 animate-shake" />
+              {/* Shimmer overlay */}
+              <div className="absolute inset-0 animate-shimmer pointer-events-none" />
+
+              {/* Trophy with enhanced animation */}
+              <div className="relative mb-4 flex justify-center items-center">
+                {/* Sparkle effects around trophy */}
+                <div className="absolute -top-2 -left-4 text-2xl animate-star-sparkle" style={{ animationDelay: '0s' }}>✨</div>
+                <div className="absolute -top-2 -right-4 text-2xl animate-star-sparkle" style={{ animationDelay: '0.5s' }}>✨</div>
+                <div className="absolute top-8 -left-8 text-xl animate-star-sparkle" style={{ animationDelay: '1s' }}>⭐</div>
+                <div className="absolute top-8 -right-8 text-xl animate-star-sparkle" style={{ animationDelay: '1.5s' }}>⭐</div>
+
+                <div className="flex justify-center animate-trophy-rotate-and-tilt">
+                  <img src="/trophy.svg" alt="Trophy" className="w-28 h-28 drop-shadow-2xl" />
                 </div>
               </div>
 
-              {/* Messages */}
-              <p className="text-[#0D0009] text-lg mb-2">Well Played!</p>
-              <p className="text-[#0D0009] text-2xl font-bold mb-1">
-                You earned <span className="text-yellow-400">{coinsAwarded.toLocaleString()} COINS</span>
-              </p>
+              {/* Messages with celebration effect */}
+              <div className="animate-celebrate-pop" style={{ animationDelay: '0.3s' }}>
+                <p className="text-[#0D0009] text-xl font-bold mb-1">
+                  {correctCount === totalQuestions ? '🎉 Perfect Score! 🎉' :
+                   correctCount >= totalQuestions * 0.8 ? '🌟 Excellent! 🌟' :
+                   correctCount >= totalQuestions * 0.5 ? '👏 Well Played! 👏' :
+                   '💪 Keep Practicing! 💪'}
+                </p>
+                <p className="text-[#0D0009]/80 text-sm mb-4">
+                  You answered {correctCount} out of {totalQuestions} correctly!
+                </p>
+              </div>
 
-              {/* Performance Metrics */}
-              <div className="grid grid-cols-4 gap-3 mb-6 mt-6">
+              {/* Performance Metrics with staggered pop animation */}
+              <div className="grid grid-cols-4 gap-2 mb-6">
                 {/* Score */}
-                <div className="bg-[#0D0009] rounded-lg p-3 border border-[#BFBAA7] flex flex-col items-center justify-center text-center">
-                  <p className="text-[#FFF6D9] text-2xl font-bold">{score}</p>
-                  <p className="text-[#FFF6D9]/80 text-xs mt-1">Score</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#FFD700]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-1 transform hover:scale-105 transition-transform">
+                  <p className="text-[#FFD700] text-2xl font-bold" style={{ textShadow: '0 0 8px rgba(255, 215, 0, 0.3)' }}>
+                    {animatedScore}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Score</p>
                 </div>
                 {/* Questions */}
-                <div className="bg-[#0D0009] rounded-lg p-3 border border-[#BFBAA7] flex flex-col items-center justify-center text-center">
-                  <p className="text-[#FFF6D9] text-2xl font-bold">{totalQuestions}</p>
-                  <p className="text-[#FFF6D9]/80 text-xs mt-1">Questions</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#4ECDC4]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-2 transform hover:scale-105 transition-transform">
+                  <p className="text-[#4ECDC4] text-2xl font-bold">
+                    {totalQuestions}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Questions</p>
                 </div>
                 {/* Correct */}
-                <div className="bg-[#0D0009] rounded-lg p-3 border border-[#BFBAA7] flex flex-col items-center justify-center text-center">
-                  <p className="text-[#FFF6D9] text-2xl font-bold">{correctCount}</p>
-                  <p className="text-[#FFF6D9]/80 text-xs mt-1">Correct</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#4CAF50]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-3 transform hover:scale-105 transition-transform">
+                  <p className="text-[#4CAF50] text-2xl font-bold">
+                    {animatedCorrect}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Correct</p>
                 </div>
                 {/* Wrong */}
-                <div className="bg-[#0D0009] rounded-lg p-3 border border-[#BFBAA7] flex flex-col items-center justify-center text-center">
-                  <p className="text-[#FFF6D9] text-2xl font-bold">{wrongCount}</p>
-                  <p className="text-[#FFF6D9]/80 text-xs mt-1">Wrong</p>
+                <div className="bg-gradient-to-b from-[#1a1a2e] to-[#0D0009] rounded-xl p-3 border border-[#FF6B6B]/30 flex flex-col items-center justify-center text-center animate-metric-pop metric-delay-4 transform hover:scale-105 transition-transform">
+                  <p className="text-[#FF6B6B] text-2xl font-bold">
+                    {animatedWrong}
+                  </p>
+                  <p className="text-[#FFF6D9]/70 text-[10px] mt-1 font-medium">Wrong</p>
                 </div>
               </div>
 
-              {/* Action Button */}
-              <button
-                onClick={() => {
-                  // Reset and go back to mode selection
-                  setQuizMode(null);
-                  setQuizStarted(false);
-                  setQuizCompleted(false);
-                  setCurrentQuestionIndex(0);
-                  setSelectedAnswer(null);
-                  setAnswers([]);
-                  setScore(0);
-                  setQuestions([]);
-                  // Stop and reset music
-                  if (audioRef.current) {
-                    audioRef.current.pause();
-                    audioRef.current.currentTime = 0;
-                  }
-                  setIsMuted(false);
-                }}
-                className="w-full bg-yellow-400 text-[#0D0009] font-bold py-3 px-4 rounded-lg hover:bg-yellow-500 relative overflow-hidden"
-              >
-                <span className="relative z-10">PLAY AGAIN</span>
-                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent shiny-effect"></span>
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    // Reset and go back to mode selection
+                    setQuizMode(null);
+                    setQuizStarted(false);
+                    setQuizCompleted(false);
+                    setCurrentQuestionIndex(0);
+                    setSelectedAnswer(null);
+                    setAnswers([]);
+                    setScore(0);
+                    setQuestions([]);
+                    setAnimatedScore(0);
+                    setAnimatedCoins(0);
+                    setAnimatedCorrect(0);
+                    setAnimatedWrong(0);
+                    // Stop and reset music
+                    if (audioRef.current) {
+                      audioRef.current.pause();
+                      audioRef.current.currentTime = 0;
+                    }
+                    setIsMuted(false);
+                  }}
+                  className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-[#0D0009] font-bold py-3 px-4 rounded-xl hover:from-yellow-500 hover:to-yellow-600 relative overflow-hidden transform hover:scale-[1.02] transition-all shadow-lg"
+                  style={{ boxShadow: '0 4px 15px rgba(255, 215, 0, 0.4)' }}
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    PLAY AGAIN
+                  </span>
+                  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent shiny-effect"></span>
+                </button>
+
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="w-full bg-[#0D0009] text-[#FFF6D9] font-medium py-3 px-4 rounded-xl hover:bg-[#1a1a2e] border border-[#564C53] relative overflow-hidden transform hover:scale-[1.02] transition-all"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Back to Dashboard
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-        
+
         {/* Advertisement - Full Width */}
         <div className="w-full overflow-hidden border-b border-[#564C53] mt-2">
           <p className="text-center text-white text-xs mt-1 mb-1 font-medium border-t border-[#564C53]">ADVERTISEMENT</p>
           <AdsenseAd adSlot="8153775072" adFormat="auto" />
         </div>
-        
+
+        {/* More Contests Section */}
+        <div className="bg-[#0D0009] px-5 py-6">
+          <div className="max-w-md mx-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[#FFF6D9] text-lg font-bold flex items-center gap-2">
+                <span>🎮</span> More Contests
+              </h2>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="text-[#FFD700] text-sm font-medium hover:underline"
+              >
+                View All →
+              </button>
+            </div>
+
+            {contestsLoading ? (
+              <div className="text-center text-[#FFF6D9]/70 py-8">
+                <div className="animate-loading-spin w-8 h-8 border-2 border-[#FFD700] border-t-transparent rounded-full mx-auto mb-2"></div>
+                Loading contests...
+              </div>
+            ) : contests.length > 0 ? (
+              <div className="space-y-4">
+                {contests.map((contest, index) => (
+                  <div
+                    key={contest.id}
+                    className="animate-slide-in-up"
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  >
+                    <ContestCard
+                      contest={contest}
+                      playerCount={Math.floor(Math.random() * 500) + 100}
+                      onPlayClick={() => router.push(`/contest/${contest.id}/rules`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-[#FFF6D9]/70 py-8">
+                <p>No contests available right now.</p>
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="mt-4 text-[#FFD700] font-medium hover:underline"
+                >
+                  Explore Dashboard →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         <Footer />
       </>
     );
@@ -802,7 +982,7 @@ export default function CustomContestPage() {
           {quizStarted && (
             <>
               {/* Score */}
-              <div className="text-center text-[#FFF6D9] mb-4">
+              <div className="text-center text-[#FFD700] font-bold mb-4">
                 Your Score: {score}
               </div>
 

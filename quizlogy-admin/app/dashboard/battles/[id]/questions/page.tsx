@@ -37,6 +37,7 @@ export default function BattleQuestionsPage() {
       fetchBattle();
       fetchQuestions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battleId]);
 
   // Get unique categories from questions
@@ -589,9 +590,11 @@ export default function BattleQuestionsPage() {
                   />
                   {formData.media && (
                     <div className="media-preview">
+                      {/* eslint-disable @next/next/no-img-element */}
                       {formData.type === 'IMAGE' && (
                         <img src={getImageUrl(formData.media)} alt="Preview" />
                       )}
+                      {/* eslint-enable @next/next/no-img-element */}
                       <span>{formData.media}</span>
                     </div>
                   )}
@@ -690,9 +693,11 @@ export default function BattleQuestionsPage() {
                         <div className="question-text">{question.question}</div>
                         {question.media && question.type !== 'NONE' && (
                           <div className="question-media-small">
+                            {/* eslint-disable @next/next/no-img-element */}
                             {question.type === 'IMAGE' && (
                               <img src={getImageUrl(question.media)} alt="Question media" />
                             )}
+                            {/* eslint-enable @next/next/no-img-element */}
                             <span className="media-type-badge">{question.type}</span>
                           </div>
                         )}

@@ -31,6 +31,7 @@ export default function FunFactQuestionsPage() {
 
   useEffect(() => {
     fetchQuestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const fetchQuestions = async () => {
@@ -537,6 +538,7 @@ export default function FunFactQuestionsPage() {
                     <div className="question-cell">
                       <div className="question-text">{question.question}</div>
                       {question.media && (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={getImageUrl(question.media)} alt="Media" className="question-media" />
                       )}
                     </div>
@@ -620,6 +622,7 @@ export default function FunFactQuestionsPage() {
                   <label>Media</label>
                   {formData.media ? (
                     <div className="media-preview">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={getImageUrl(formData.media)} alt="Preview" />
                       <button
                         type="button"

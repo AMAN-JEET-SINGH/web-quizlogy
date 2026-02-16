@@ -111,8 +111,135 @@ export const adminApi = {
     return response.data;
   },
 
-  checkStatus: async (): Promise<{ isAdmin: boolean }> => {
+  checkStatus: async (): Promise<{ isAdmin: boolean; adminData?: any }> => {
     const response = await api.get('/api/admin/status', { timeout: 5000 });
+    return response.data;
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ status: boolean; message: string }> => {
+    const response = await api.post('/api/admin/change-password', { currentPassword, newPassword });
+    return response.data;
+  },
+};
+
+// Admin User interface
+export interface AdminUser {
+  id: string;
+  username: string;
+  isSuperAdmin: boolean;
+  allowedSections: string[];
+  adsenseAllowedDomains: string[];
+  adsenseAllowedCountries: string[];
+  adsenseRevenueShare: number;
+  adsenseDomainDeductions?: Record<string, number>;
+  webAppLinks: Array<{label: string; url: string}>;
+  isActive: boolean;
+  lastLogin: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+}
+
+export interface CreateAdminUserData {
+  username: string;
+  password: string;
+  allowedSections?: string[];
+  adsenseAllowedDomains?: string[];
+  adsenseAllowedCountries?: string[];
+  adsenseRevenueShare?: number;
+  adsenseDomainDeductions?: Record<string, number>;
+  webAppLinks?: Array<{label: string; url: string}>;
+  isActive?: boolean;
+}
+
+export interface UpdateAdminUserData {
+  username?: string;
+  password?: string;
+  allowedSections?: string[];
+  adsenseAllowedDomains?: string[];
+  adsenseAllowedCountries?: string[];
+  adsenseRevenueShare?: number;
+  adsenseDomainDeductions?: Record<string, number>;
+  webAppLinks?: Array<{label: string; url: string}>;
+  isActive?: boolean;
+}
+
+// Admin Users API
+export const adminUsersApi = {
+  getAll: async (): Promise<{ status: boolean; data: AdminUser[] }> => {
+    const response = await api.get('/api/admin-users');
+    return response.data;
+  },
+
+  getById: async (id: string): Promise<{ status: boolean; data: AdminUser }> => {
+    const response = await api.get(`/api/admin-users/${id}`);
+    return response.data;
+  },
+
+  getSections: async (): Promise<{ status: boolean; sections: string[] }> => {
+    const response = await api.get('/api/admin-users/sections');
+    return response.data;
+  },
+
+  create: async (data: CreateAdminUserData): Promise<{ status: boolean; message: string; data: AdminUser }> => {
+    const response = await api.post('/api/admin-users', data);
+    return response.data;
+  },
+
+  update: async (id: string, data: UpdateAdminUserData): Promise<{ status: boolean; message: string; data: AdminUser }> => {
+    const response = await api.put(`/api/admin-users/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<{ status: boolean; message: string }> => {
+    const response = await api.delete(`/api/admin-users/${id}`);
+    return response.data;
+  },
+
+  toggleActive: async (id: string): Promise<{ status: boolean; message: string; data: { id: string; username: string; isActive: boolean } }> => {
+    const response = await api.patch(`/api/admin-users/${id}/toggle-active`);
+    return response.data;
+  },
+};
+
+// Country API (for multi-country feature)
+export interface AppCountry {
+  code: string;
+  name: string;
+  flagUrl?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const countriesApi = {
+  getActive: async (): Promise<{ status: boolean; data: AppCountry[] }> => {
+    const response = await api.get('/api/countries');
+    return response.data;
+  },
+
+  getAll: async (): Promise<{ status: boolean; data: AppCountry[] }> => {
+    const response = await api.get('/api/countries/all');
+    return response.data;
+  },
+
+  create: async (data: { code: string; name: string; flagUrl?: string; isActive?: boolean }): Promise<{ status: boolean; data: AppCountry }> => {
+    const response = await api.post('/api/countries', data);
+    return response.data;
+  },
+
+  update: async (code: string, data: { name?: string; flagUrl?: string; isActive?: boolean }): Promise<{ status: boolean; data: AppCountry }> => {
+    const response = await api.put(`/api/countries/${code}`, data);
+    return response.data;
+  },
+
+  delete: async (code: string): Promise<{ status: boolean; message: string }> => {
+    const response = await api.delete(`/api/countries/${code}`);
+    return response.data;
+  },
+
+  seed: async (): Promise<{ status: boolean; message: string; data: AppCountry[] }> => {
+    const response = await api.post('/api/countries/seed');
     return response.data;
   },
 };
@@ -126,6 +253,7 @@ export interface Category {
   imageUrl?: string;
   backgroundColor?: string | null;
   status: 'ACTIVE' | 'INACTIVE';
+  countries?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -136,6 +264,7 @@ export interface CreateCategoryData {
   imagePath: string;
   backgroundColor?: string;
   status?: 'ACTIVE' | 'INACTIVE';
+  countries?: string[];
 }
 
 export const categoriesApi = {
@@ -210,6 +339,7 @@ export interface Contest {
   questionCount: number;
   duration: number;
   region: string;
+  countries?: string[];
   prizePool: string;
   marking: number;
   negativeMarking: number;
@@ -234,15 +364,31 @@ export interface CreateContestData {
   questionCount?: number;
   duration?: number;
   region?: string;
+  countries?: string[];
   prizePool?: string | string[];
   marking?: number;
   negativeMarking?: number;
   lifeLineCharge?: number;
 }
 
+export interface ContestsResponse {
+  status: boolean;
+  data: Contest[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export const contestsApi = {
-  getAll: async (): Promise<Contest[]> => {
-    const response = await api.get('/api/contests');
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<ContestsResponse> => {
+    const response = await api.get('/api/contests', { params });
     return response.data;
   },
 
@@ -309,6 +455,7 @@ export interface Question {
   media: string | null;
   options: string[] | Array<{ text: string; image: string }>;
   correctOption: string;
+  countries?: string[];
   order: number;
 }
 
@@ -318,6 +465,7 @@ export interface CreateQuestionData {
   media?: string;
   options: string[];
   correctOption: string;
+  countries?: string[];
   order?: number;
 }
 
@@ -330,6 +478,7 @@ export interface QuestionWithContest extends Question {
       name: string;
     };
     region?: string;
+    countries?: string[];
   };
   createdAt?: string;
   updatedAt?: string;
@@ -341,6 +490,7 @@ export const questionsApi = {
     contestId?: string;
     type?: string;
     region?: string;
+    country?: string;
     level?: string;
     search?: string;
   }): Promise<{
@@ -588,6 +738,8 @@ export const visitorsApi = {
     os?: string;
     browser?: string;
     origins?: string[];
+    dateFrom?: string;
+    dateTo?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   }): Promise<VisitorsResponse> => {
@@ -856,7 +1008,8 @@ export interface TwoQuestion {
   options: string[];
   correctOption: string;
   status: 'ACTIVE' | 'INACTIVE';
-  region?: 'IND' | 'ALL'; // Country/region: IND = India only, ALL = everyone (intro page filter)
+  region?: 'IND' | 'ALL'; // Legacy
+  countries?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -869,19 +1022,40 @@ export interface CreateTwoQuestionData {
   correctOption: string;
   status?: 'ACTIVE' | 'INACTIVE';
   region?: 'IND' | 'ALL';
+  countries?: string[];
+}
+
+export interface TwoQuestionsResponse {
+  status: boolean;
+  data: TwoQuestion[];
+  total: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export const twoQuestionsApi = {
   getAll: async (params?: {
     status?: 'ACTIVE' | 'INACTIVE' | 'ALL';
     search?: string;
-  }): Promise<{ status: boolean; data: TwoQuestion[]; total: number }> => {
+    page?: number;
+    limit?: number;
+  }): Promise<TwoQuestionsResponse> => {
     const queryParams: any = {};
     if (params?.status && params.status !== 'ALL') {
       queryParams.status = params.status;
     }
     if (params?.search) {
       queryParams.search = params.search;
+    }
+    if (params?.page) {
+      queryParams.page = params.page;
+    }
+    if (params?.limit) {
+      queryParams.limit = params.limit;
     }
     const response = await api.get('/api/two-questions', { params: queryParams });
     return response.data;
@@ -1009,6 +1183,326 @@ export const battlesApi = {
 
   deleteQuestion: async (battleId: string, questionId: string): Promise<void> => {
     await api.delete(`/api/battles/${battleId}/questions/${questionId}`);
+  },
+};
+
+// AdSense API
+export interface AdSenseAccount {
+  name: string;
+  publisherId: string;
+  state: string;
+  timeZone: string;
+}
+
+export interface AdSenseReportRow {
+  DATE?: string;
+  COUNTRY?: string;
+  AD_UNIT_NAME?: string;
+  ESTIMATED_EARNINGS: number;
+  PAGE_VIEWS: number;
+  CLICKS: number;
+  IMPRESSIONS: number;
+  PAGE_VIEWS_CTR: number;
+  COST_PER_CLICK: number;
+  PAGE_VIEWS_RPM: number;
+}
+
+export interface AdSenseReport {
+  rows: AdSenseReportRow[];
+  totalRows: number;
+}
+
+export interface AdSenseMetric {
+  value: number;
+  delta: number;
+}
+
+export interface AdSenseSummary {
+  period: string;
+  startDate: string;
+  endDate: string;
+  earnings: AdSenseMetric;
+  pageViews: AdSenseMetric;
+  clicks: AdSenseMetric;
+  impressions: AdSenseMetric;
+  ctr: AdSenseMetric;
+  rpm: AdSenseMetric;
+}
+
+export interface AdSenseAdUnit {
+  name: string;
+  type: string;
+  state: string;
+  earnings: number;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+}
+
+export interface AdSensePayment {
+  date: string;
+  amount: string;
+}
+
+export interface AdSenseSite {
+  domain: string;
+  state: string;
+  autoAdsEnabled: boolean;
+}
+
+export interface AdSenseDetailedRow {
+  DATE: string;
+  COUNTRY_NAME: string;
+  DOMAIN_NAME: string;
+  ESTIMATED_EARNINGS: number;
+  PAGE_VIEWS: number;
+  PAGE_VIEWS_RPM: number;
+  IMPRESSIONS: number;
+  IMPRESSIONS_RPM: number;
+  CLICKS: number;
+}
+
+export interface AdSenseDetailedTotals {
+  earnings: number;
+  pageViews: number;
+  impressions: number;
+  clicks: number;
+  avgPageViewsRpm: number;
+  avgImpressionsRpm: number;
+}
+
+export interface AdSenseDetailedReport {
+  rows: AdSenseDetailedRow[];
+  domains: string[];
+  countries: string[];
+  totals: AdSenseDetailedTotals;
+  lastFetched: string;
+  complete: boolean;
+  missingDates?: string[];
+}
+
+export interface AdSenseSyncStatus {
+  lastSynced: string | null;
+  nextSync: string | null;
+  status: 'idle' | 'syncing' | 'error';
+  rowsCount: number;
+}
+
+// Invoice Request Types
+export interface InvoiceRequest {
+  id: string;
+  adminId: string;
+  adminUsername: string;
+  monthKey: string;
+  monthName: string;
+  carryforward: number;
+  grossEarnings: number;
+  deductions: number;
+  netEarnings: number;
+  totalUSD: number;
+  totalINR: number;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectionNote?: string | null;
+  filePath?: string | null;
+  requestedAt: string;
+  processedAt?: string | null;
+  processedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInvoiceRequestData {
+  monthKey: string;
+  monthName: string;
+  carryforward: number;
+  grossEarnings: number;
+  deductions: number;
+  netEarnings: number;
+  totalUSD: number;
+  totalINR: number;
+}
+
+export interface OverviewPeriod {
+  earnings: number;
+  delta: number;
+  pageViews: number;
+  impressions: number;
+  clicks: number;
+}
+
+export interface OverviewData {
+  today: OverviewPeriod;
+  yesterday: OverviewPeriod;
+  last7Days: OverviewPeriod;
+  thisMonth: OverviewPeriod;
+  lastMonth: OverviewPeriod;
+  lastSynced: string | null;
+}
+
+export interface AdminAdSenseSummary {
+  adminId: string;
+  username: string;
+  earnings: number;
+  impressions: number;
+  impressionsRpm: number;
+  domains: string[];
+  isActive: boolean;
+}
+
+export const adsenseApi = {
+  getOverview: async (): Promise<OverviewData> => {
+    const response = await api.get('/api/adsense/overview');
+    return response.data;
+  },
+
+  getAccount: async (): Promise<AdSenseAccount> => {
+    const response = await api.get('/api/adsense/account');
+    return response.data;
+  },
+
+  getReport: async (params?: {
+    startDate?: string;
+    endDate?: string;
+    dimension?: string;
+  }): Promise<AdSenseReport> => {
+    const response = await api.get('/api/adsense/report', { params });
+    return response.data;
+  },
+
+  getSummary: async (period?: string): Promise<AdSenseSummary> => {
+    const response = await api.get('/api/adsense/report/summary', { params: { period } });
+    return response.data;
+  },
+
+  getAdUnits: async (): Promise<AdSenseAdUnit[]> => {
+    const response = await api.get('/api/adsense/adunits');
+    return response.data;
+  },
+
+  getPayments: async (): Promise<AdSensePayment[]> => {
+    const response = await api.get('/api/adsense/payments');
+    return response.data;
+  },
+
+  getSites: async (): Promise<AdSenseSite[]> => {
+    const response = await api.get('/api/adsense/sites');
+    return response.data;
+  },
+
+  getDetailedReport: async (startDate: string, endDate: string): Promise<AdSenseDetailedReport> => {
+    const response = await api.get('/api/adsense/report/detailed', {
+      params: { startDate, endDate },
+    });
+    return response.data;
+  },
+
+  fetchDetailedReport: async (startDate: string, endDate: string): Promise<AdSenseDetailedReport> => {
+    const response = await api.post('/api/adsense/report/detailed/fetch', { startDate, endDate });
+    return response.data;
+  },
+
+  getDomains: async (): Promise<{ status: boolean; domains: string[] }> => {
+    const response = await api.get('/api/adsense/domains');
+    return response.data;
+  },
+
+  getCountries: async (): Promise<{ status: boolean; countries: string[] }> => {
+    const response = await api.get('/api/adsense/countries');
+    return response.data;
+  },
+
+  getSyncStatus: async (): Promise<AdSenseSyncStatus> => {
+    const response = await api.get('/api/adsense/sync-status');
+    return response.data;
+  },
+
+  triggerSync: async (): Promise<{ status: boolean; message: string }> => {
+    const response = await api.post('/api/adsense/sync');
+    return response.data;
+  },
+
+  exportData: async (startDate: string, endDate: string): Promise<Blob> => {
+    const response = await api.get('/api/adsense/export', {
+      params: { startDate, endDate },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  // Monthly earnings from local DB (no Google API)
+  getMonthlyEarnings: async (): Promise<{
+    status: boolean;
+    data: Array<{
+      monthKey: string;
+      monthName: string;
+      earnings: number;
+      status: string;
+      invoiceId: string | null;
+    }>;
+    carryforward: number;
+    revenueShare: number;
+  }> => {
+    const response = await api.get('/api/adsense/monthly-earnings');
+    return response.data;
+  },
+
+  // Invoice Request APIs
+  getInvoices: async (): Promise<{ status: boolean; data: InvoiceRequest[] }> => {
+    const response = await api.get('/api/adsense/invoices');
+    return response.data;
+  },
+
+  createInvoice: async (data: CreateInvoiceRequestData, file?: File): Promise<{ status: boolean; data: InvoiceRequest }> => {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      formData.append(key, String(value));
+    });
+    if (file) formData.append('file', file);
+    const response = await api.post('/api/adsense/invoices', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  updateInvoiceStatus: async (id: string, status: 'pending' | 'approved' | 'rejected', rejectionNote?: string): Promise<{ status: boolean; data: InvoiceRequest }> => {
+    const response = await api.put(`/api/adsense/invoices/${id}`, { status, rejectionNote });
+    return response.data;
+  },
+
+  deleteInvoice: async (id: string): Promise<{ status: boolean; message: string }> => {
+    const response = await api.delete(`/api/adsense/invoices/${id}`);
+    return response.data;
+  },
+
+  getApprovedInvoices: async (): Promise<{ status: boolean; data: InvoiceRequest[] }> => {
+    const response = await api.get('/api/adsense/invoices/approved');
+    return response.data;
+  },
+
+  getAdminSummary: async (): Promise<{ status: boolean; data: AdminAdSenseSummary[] }> => {
+    const response = await api.get('/api/adsense/admin-summary');
+    return response.data;
+  },
+
+  getInvoiceFileUrl: (id: string) => `${API_URL}/api/adsense/invoices/file/${id}`,
+};
+
+// App Settings API
+export interface AppSettings {
+  id: string;
+  revenueDeductPercent: number;
+  updatedAt: string;
+}
+
+export const appSettingsApi = {
+  get: async (): Promise<{ status: boolean; data: AppSettings }> => {
+    const response = await api.get('/api/app-settings');
+    return response.data;
+  },
+
+  update: async (data: { revenueDeductPercent: number }): Promise<{ status: boolean; data: AppSettings }> => {
+    const response = await api.put('/api/app-settings', data);
+    return response.data;
   },
 };
 

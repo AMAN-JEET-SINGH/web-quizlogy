@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { battlesApi, Battle, CreateBattleData, uploadApi } from '@/lib/api';
 import { getImageUrl } from '@/lib/utils';
 import ImageGallery from '@/components/ImageGallery';
@@ -15,6 +15,7 @@ export default function BattleManagement() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingBattle, setEditingBattle] = useState<Battle | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<CreateBattleData>({
     name: '',
     description: '',
@@ -127,6 +128,9 @@ export default function BattleManagement() {
       status: battle.status,
     });
     setShowForm(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const toggleSelect = (id: string) => {
@@ -431,7 +435,7 @@ export default function BattleManagement() {
       )}
 
       {showForm && (
-        <div className="form-panel">
+        <div ref={formRef} className="form-panel">
           <h2>{editingBattle ? 'Edit Battle' : 'Create New Battle'}</h2>
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -482,8 +486,9 @@ export default function BattleManagement() {
                         minHeight: '120px'
                       }}
                     >
-                      <img 
-                        src={getImageUrl(formData.imagePath)} 
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getImageUrl(formData.imagePath)}
                         alt="Preview"
                         style={{
                           display: 'block',
@@ -624,6 +629,7 @@ export default function BattleManagement() {
                 <div className="item-image">
                   {item.imagePath && getImageUrl(item.imagePath) ? (
                     <div className="image-preview-small">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={getImageUrl(item.imagePath)} alt={item.name} />
                       <button
                         onClick={() => {
@@ -712,6 +718,7 @@ export default function BattleManagement() {
                     </label>
                   </td>
                   <td>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={battle.imageUrl || getImageUrl(battle.imagePath)}
                       alt={battle.name}

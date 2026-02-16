@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardNav } from '@/components/DashboardNav';
 import { Footer } from '@/components/Footer';
+import { LoadingScreen } from '@/components/LoadingScreen';
 import { SEOHead } from '@/components/SEOHead';
 import { authApi, User, wheelApi } from '@/lib/api';
 
@@ -36,8 +37,31 @@ export default function SpinWheelPage() {
     { label: '0', value: 0, coinImage: '/zerocoin.png' },
   ];
 
-  const spinCost = 50;
+  const maxDailySpins = 3;
+  const [spinsRemaining, setSpinsRemaining] = useState(maxDailySpins);
   const anglePerPrize = 360 / prizes.length;
+
+  // Get today's date string for tracking daily spins
+  const getTodayString = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+  };
+
+  // Check and reset daily spins
+  const checkDailySpins = () => {
+    const storedDate = localStorage.getItem('spinDate');
+    const storedSpins = localStorage.getItem('spinsRemaining');
+    const today = getTodayString();
+
+    if (storedDate !== today) {
+      // New day, reset spins
+      localStorage.setItem('spinDate', today);
+      localStorage.setItem('spinsRemaining', maxDailySpins.toString());
+      setSpinsRemaining(maxDailySpins);
+    } else if (storedSpins) {
+      setSpinsRemaining(parseInt(storedSpins));
+    }
+  };
   
   // Helper function to get which prize is at the pointer (top position)
   const getPrizeAtPointer = (currentRotation: number): number => {
@@ -72,7 +96,8 @@ export default function SpinWheelPage() {
 
   useEffect(() => {
     checkAuth();
-    
+    checkDailySpins();
+
     // Listen for coin updates from other parts of the app
     const handleCoinsUpdate = () => {
       const storedUser = localStorage.getItem('user');
@@ -166,28 +191,6 @@ export default function SpinWheelPage() {
 
     const storedUser = localStorage.getItem('user');
     const isGuest = !storedUser;
-    let currentCoins = 0;
-    
-    if (isGuest) {
-      currentCoins = parseInt(localStorage.getItem('guestCoins') || '0');
-    } else {
-      // Try multiple sources for coins
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          currentCoins = parsedUser.coins || parsedUser.coin || userCoins || 0;
-        } catch (err) {
-          currentCoins = userCoins || 0;
-        }
-      } else {
-        currentCoins = userCoins || 0;
-      }
-    }
-
-    if (currentCoins < spinCost) {
-      alert(`You need ${spinCost} coins to spin. You have ${currentCoins} coins.`);
-      return;
-    }
 
     if (isGuest) {
       alert('Please sign in to spin the wheel.');
@@ -195,10 +198,21 @@ export default function SpinWheelPage() {
       return;
     }
 
+    // Check daily spin limit
+    if (spinsRemaining <= 0) {
+      alert('You have used all your spins for today. Come back tomorrow for 3 more free spins!');
+      return;
+    }
+
     try {
       setSpinning(true);
       setResult(null);
       setShowMessage(false);
+
+      // Decrement spins remaining
+      const newSpinsRemaining = spinsRemaining - 1;
+      setSpinsRemaining(newSpinsRemaining);
+      localStorage.setItem('spinsRemaining', newSpinsRemaining.toString());
 
       // Randomly select a prize
       const randomIndex = Math.floor(Math.random() * prizes.length);
@@ -243,67 +257,47 @@ export default function SpinWheelPage() {
       // Update rotation state (this will trigger the animation via the style prop)
       setRotation(totalRotation);
 
-      // Deduct coins immediately (user sees the deduction right away)
-      if (user) {
-        try {
-          const coinsAfterDeduction = currentCoins - spinCost;
-          setUserCoins(coinsAfterDeduction);
-          
-          // Update user in localStorage
-          const updatedUser = { ...user, coins: coinsAfterDeduction };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-          setUser(updatedUser);
-          
-          window.dispatchEvent(new Event('coinsUpdated'));
-        } catch (err) {
-          console.error('Error deducting coins:', err);
-        }
-      }
-
       // Show result after animation and update coins with prize
       setTimeout(async () => {
         // Verify which prize is actually at the pointer
         const actualPrizeIndex = getPrizeAtPointer(totalRotation);
         const actualPrize = prizes[actualPrizeIndex];
-        
+
         // Use the actual prize at pointer, not the randomly selected one
         setResult(actualPrize);
         setShowMessage(true);
-        
-        // Add prize coins to the already-deducted amount
-        // This ensures if you spend 100 and win 100, balance stays the same
+
+        // Add prize coins to user's balance (free spin, so just add the prize)
         if (user && actualPrize.value > 0) {
           try {
-            // Get current coins (already deducted spinCost)
             const storedUser = localStorage.getItem('user');
             if (storedUser) {
               const parsedUser = JSON.parse(storedUser);
-              const coinsAfterDeduction = parsedUser.coins || parsedUser.coin || 0;
-              
-              // Add prize: coinsAfterDeduction + prize = original - spinCost + prize
-              const finalCoins = coinsAfterDeduction + actualPrize.value;
-              
+              const currentCoins = parsedUser.coins || parsedUser.coin || 0;
+
+              // Add prize to current coins
+              const finalCoins = currentCoins + actualPrize.value;
+
               setUserCoins(finalCoins);
-              
+
               // Update user in localStorage
               const updatedUser = { ...parsedUser, coins: finalCoins };
               localStorage.setItem('user', JSON.stringify(updatedUser));
               setUser(updatedUser);
-              
-              // Save spin history locally (API endpoint not available yet)
+
+              // Save spin history locally
               try {
                 const spinHistory = JSON.parse(localStorage.getItem('spinHistory') || '[]');
                 const newSpinRecord = {
                   id: Date.now().toString(),
                   timestamp: new Date().toISOString(),
-                  cost: spinCost,
+                  cost: 0,
                   prize: actualPrize.value,
                   prizeLabel: actualPrize.label,
-                  coinsBefore: coinsAfterDeduction + spinCost, // Original coins before spin
+                  coinsBefore: currentCoins,
                   coinsAfter: finalCoins,
                 };
-                spinHistory.unshift(newSpinRecord); // Add to beginning
-                // Keep only last 100 spins
+                spinHistory.unshift(newSpinRecord);
                 if (spinHistory.length > 100) {
                   spinHistory.pop();
                 }
@@ -311,7 +305,7 @@ export default function SpinWheelPage() {
               } catch (err) {
                 console.error('Error saving spin history:', err);
               }
-              
+
               window.dispatchEvent(new Event('coinsUpdated'));
             }
           } catch (err) {
@@ -323,17 +317,17 @@ export default function SpinWheelPage() {
             const storedUser = localStorage.getItem('user');
             if (storedUser) {
               const parsedUser = JSON.parse(storedUser);
-              const coinsAfterDeduction = parsedUser.coins || parsedUser.coin || 0;
-              
+              const currentCoins = parsedUser.coins || parsedUser.coin || 0;
+
               const spinHistory = JSON.parse(localStorage.getItem('spinHistory') || '[]');
               const newSpinRecord = {
                 id: Date.now().toString(),
                 timestamp: new Date().toISOString(),
-                cost: spinCost,
+                cost: 0,
                 prize: 0,
                 prizeLabel: '0',
-                coinsBefore: coinsAfterDeduction + spinCost, // Add back the cost to get original
-                coinsAfter: coinsAfterDeduction,
+                coinsBefore: currentCoins,
+                coinsAfter: currentCoins,
               };
               spinHistory.unshift(newSpinRecord);
               if (spinHistory.length > 100) {
@@ -345,9 +339,8 @@ export default function SpinWheelPage() {
             console.error('Error saving spin history:', err);
           }
         }
-        
+
         // Keep rotation cumulative (don't normalize) so coins stay in position
-        // The modulo is only for display, but we keep the full rotation for next spin
         setSpinning(false);
       }, 3000);
     } catch (err) {
@@ -360,9 +353,7 @@ export default function SpinWheelPage() {
     return (
       <>
         <DashboardNav />
-        <div className="min-h-screen bg-[#1A0F3D] flex items-center justify-center">
-          <div className="text-white text-xl">Loading...</div>
-        </div>
+        <LoadingScreen message="Loading spin wheel..." fullPage />
         <Footer />
       </>
     );
@@ -376,64 +367,78 @@ export default function SpinWheelPage() {
         keywords="spin wheel, win prizes, quiz wheel, coin wheel, quiz rewards, spin to win"
       />
       <DashboardNav />
-      <div className="min-h-screen bg-[#1A0F3D] p-5">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="bg-[#392C6E] rounded-xl p-6 mb-5 shadow-lg">
-            <div className="flex items-center justify-between mb-4">
-              <button
-                onClick={() => router.back()}
-                className="text-white hover:text-gray-300 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <h1 className="text-white text-3xl font-bold">Spin Wheel</h1>
-              <div className="w-6"></div>
+      <div className="min-h-screen bg-[#0D0009] flex flex-col" style={{ boxShadow: '0px 0px 2px 0px #FFF6D9' }}>
+        <div className="container mx-auto px-4 sm:px-6 py-4 flex-1 pb-20">
+          {/* Top Banner */}
+          <div className="relative rounded-2xl overflow-hidden mb-4" style={{ minHeight: '140px' }}>
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage: 'url(/bg-quiz.svg)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }}
+            />
+            <div className="relative z-10 flex items-center justify-center h-full py-6">
+              <img src="/spin.svg" alt="Spin" className="w-20 h-20 object-contain opacity-90" />
             </div>
-            
-            <div className="flex items-center justify-center gap-4 text-white">
-              <div className="flex items-center gap-2 bg-[#2C2159] px-4 py-2 rounded-lg">
-                <img src="/coin.svg" alt="Coins" className="w-5 h-5" />
-                <span className="font-bold">{userCoins.toLocaleString()}</span>
-              </div>
-              <div className="text-sm">
-                Cost per spin: <span className="font-bold text-yellow-400">{spinCost} coins</span>
-              </div>
+            <div
+              className="relative z-10 px-6 pb-3"
+              style={{
+                background: 'linear-gradient(180deg, rgba(13, 0, 9, 0) 0%, #0D0009 100%)'
+              }}
+            >
+              <h1 className="text-[#FFF6D9] text-xl sm:text-2xl md:text-3xl font-bold mb-1">
+                Spin the Wheel
+              </h1>
+              <p className="text-[#FFF6D9]/80 text-sm sm:text-base">
+                3 free spins daily - win coins!
+              </p>
             </div>
           </div>
 
-          
-
           {/* Wheel Container */}
-          <div className="bg-[#392C6E] rounded-xl p-8 shadow-lg mb-5">
+          <div
+            className="rounded-2xl p-6 mb-6 border border-[#FFF6D9]/20"
+            style={{
+              backgroundImage: 'url(/Maskgroup.svg)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              boxShadow: '0px 0px 2px 0px #FFF6D9'
+            }}
+          >
             {/* Result Message */}
-          {showMessage && result && (
-                <div className={`mt-6 px-6 py-4 rounded-xl text-center ${
-                  result.value > 0 
-                    ? ' text-white' 
-                    : 'text-white'
-                }`}>
-                  {result.value > 0 ? (
-                    <>
-                      <p className="text-2xl font-bold mb-2">🎉 Congratulations! 🎉</p>
-                      <p className="text-xl">You won <span className="font-bold">{result.value} coins</span>!</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold mb-2">😔 Oops! Try Again</p>
-                      <p className="text-xl">Better luck next time!</p>
-                    </>
-                  )}
-                </div>
-              )}
+            {showMessage && result && (
+              <div className="mt-4 px-4 py-3 rounded-xl text-center border border-[#FFF6D9]/30 bg-[#0D0009]/80">
+                {result.value > 0 ? (
+                  <>
+                    <p className="text-[#FFF6D9] text-xl font-bold mb-1">🎉 Congratulations! 🎉</p>
+                    <p className="text-[#FFF6D9]">You won <span className="font-bold text-yellow-400">{result.value} coins</span>!</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[#FFF6D9] text-xl font-bold mb-1">😔 Oops! Try Again</p>
+                    <p className="text-[#FFF6D9]/80">Better luck next time!</p>
+                  </>
+                )}
+              </div>
+            )}
             <div className="relative flex flex-col items-center">
+              <p className="text-[#FFF6D9]/90 text-sm mb-4">
+                Spins remaining today: <span className="font-bold text-yellow-400">{spinsRemaining}/{maxDailySpins}</span>
+                <span className="text-[#FFF6D9]/70 ml-2">·</span>
+                <span className="ml-2">
+                  <img src="/coin.svg" alt="" className="w-4 h-4 inline align-middle mr-1" />
+                  <span className="font-bold text-[#FFF6D9]">{userCoins.toLocaleString()}</span>
+                </span>
+              </p>
               {/* Wheel */}
               <div className="relative w-80 h-80 mb-8">
                 {/* Pointer at top */}
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-2 z-30">
-                  <div className="w-0 h-0 border-l-[20px] border-r-[20px] border-t-[40px] border-l-transparent border-r-transparent border-t-yellow-400"></div>
+                  <div className="w-0 h-0 border-l-[20px] border-r-[20px] border-t-[40px] border-l-transparent border-r-transparent border-t-[#FFD602]"></div>
                 </div>
 
                 {/* Wheel Base with rotating container */}
@@ -486,8 +491,8 @@ export default function SpinWheelPage() {
                 {/* Center Spin Button */}
                 <button
                   onClick={handleSpin}
-                  disabled={spinning || userCoins < spinCost}
-                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[#FBD457] rounded-full border-4 border-yellow-400 flex items-center justify-center z-20 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+                  disabled={spinning || spinsRemaining <= 0}
+                  className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-[#FFD602] rounded-full border-4 border-[#FFF6D9]/50 flex items-center justify-center z-20 hover:bg-[#FFE033] disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
                 >
                   <img src="/spin.svg" alt="Spin" className="w-24 h-24" />
                 </button>
@@ -496,22 +501,14 @@ export default function SpinWheelPage() {
               {/* Bottom Spin Button */}
               <button
                 onClick={handleSpin}
-                disabled={spinning || userCoins < spinCost}
-                className="w-full bg-[#FBD457] text-[#392C6E] font-bold py-4 px-12 rounded-xl text-xl hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 relative overflow-hidden"
+                disabled={spinning || spinsRemaining <= 0}
+                className="w-full bg-[#FFD602] text-[#0D0009] font-bold py-4 px-12 rounded-xl text-lg sm:text-xl hover:bg-[#FFE033] disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] shadow-lg mt-2"
               >
                 <span className="relative z-10">
-                  {spinning ? 'Spinning...' : `Spin (${spinCost} coins)`}
+                  {spinning ? 'Spinning...' : spinsRemaining > 0 ? `Spin (${spinsRemaining} left)` : 'No spins left today'}
                 </span>
-                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent shiny-effect"></span>
               </button>
 
-              {!user && (
-                <p className="text-white/70 text-sm mt-4">
-                  Please <button onClick={() => router.push('/login')} className="text-yellow-400 underline">sign in</button> to spin the wheel
-                </p>
-              )}
-
-              
             </div>
           </div>
         </div>

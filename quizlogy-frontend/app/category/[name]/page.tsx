@@ -20,6 +20,7 @@ export default function CategoryDetailPage({ params }: { params: { name: string 
   const [heroMeta, setHeroMeta] = useState<{ questionCount: number; durationSeconds: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   useEffect(() => {
     if (categoryId) {
@@ -146,32 +147,36 @@ export default function CategoryDetailPage({ params }: { params: { name: string 
               {/* Category Image Card */}
               <div className="flex-shrink-0">
                 <div
-                  className="rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center"
+                  className="rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center overflow-hidden"
                   style={{
                     backgroundColor: backgroundColor,
                     width: '120px',
-                    height: '120px',
+                    height: '140px',
                     minWidth: '120px'
                   }}
                 >
-                  {categoryImageUrl ? (
-                    <img
-                      src={categoryImageUrl}
-                      alt={category.name}
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        img.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-[#0D0009]/10 rounded-full flex items-center justify-center">
-                      <span className="text-2xl font-bold text-[#0D0009]/30">
-                        {category.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                  <p className="text-xs sm:text-sm font-semibold text-[#0D0009] mt-2 text-center">
+                  {/* Image container with fixed size */}
+                  <div className="w-[80px] h-[80px] flex items-center justify-center flex-shrink-0">
+                    {categoryImageUrl ? (
+                      <img
+                        src={categoryImageUrl}
+                        alt={category.name}
+                        className="max-w-full max-h-full object-contain"
+                        onError={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          img.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-[#0D0009]/10 rounded-full flex items-center justify-center">
+                        <span className="text-2xl font-bold text-[#0D0009]/30">
+                          {category.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Category name with truncation */}
+                  <p className="text-xs sm:text-sm font-semibold text-[#0D0009] mt-2 text-center w-full truncate px-1">
                     {category.name}
                   </p>
                 </div>
@@ -179,12 +184,19 @@ export default function CategoryDetailPage({ params }: { params: { name: string 
               
               {/* Category Description */}
               <div className="flex-1">
-                <p className="text-[#FFF6D9] text-sm sm:text-base leading-relaxed">
+                <p
+                  className={`text-[#FFF6D9] text-sm leading-relaxed ${
+                    !isDescriptionExpanded ? 'line-clamp-4' : ''
+                  }`}
+                >
                   {category.description || `Welcome to the ${category.name} category on Quizlogy, where you can test your knowledge and compete in exciting quizzes. Challenge yourself with questions covering various topics and win amazing prizes!`}
                 </p>
-                {category.description && category.description.length > 200 && (
-                  <button className="text-[#9272FF] text-sm mt-2 hover:underline">
-                    View More
+                {(category.description?.length ?? 0) > 150 && (
+                  <button
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="text-[#FFD602] text-sm mt-2 font-semibold hover:underline"
+                  >
+                    {isDescriptionExpanded ? 'Read Less' : 'Read More'}
                   </button>
                 )}
               </div>
@@ -197,8 +209,8 @@ export default function CategoryDetailPage({ params }: { params: { name: string 
           </p>
 
           {/* Tap to Play Card */}
-          <div 
-            className="relative rounded-2xl p-6 sm:p-8 mb-6 overflow-hidden border border-[#564C53] min-h-[150px] sm:min-h-[170px] flex items-center"
+          <div
+            className="relative rounded-2xl p-6 sm:p-8 mb-6 overflow-hidden border border-[#564C53] min-h-[150px] sm:min-h-[170px]"
             style={{
               background: `linear-gradient(90deg, #0D0009 42.05%, rgba(13, 0, 9, 0) 100%)`,
             }}
@@ -215,37 +227,41 @@ export default function CategoryDetailPage({ params }: { params: { name: string 
               }}
             />
 
-            {/* Category/contest logo (on top of bg) */}
-            {heroLogoUrl && (
-              <div className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 pointer-events-none z-10">
-                <img
-                  src={heroLogoUrl}
-                  alt={heroContest?.name || category.name}
-                  className="relative w-full h-full object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    img.style.display = 'none';
+            {/* Content wrapper with flex layout */}
+            <div className="relative z-10 flex items-center justify-between h-full">
+              {/* Text content */}
+              <div className="flex-1 pr-4">
+                <p className="text-[#FFF6D9] text-lg sm:text-xl font-semibold mb-4">
+                  We've got a {category.name} quiz for you!
+                </p>
+                <button
+                  onClick={() => {
+                    if (contests.length > 0) {
+                      handlePlayClick(contests[0].id);
+                    } else {
+                      router.push('/all-contests');
+                    }
                   }}
-                />
+                  className="bg-[#FFD602] text-[#0D0009] font-bold px-6 py-3 rounded-lg hover:bg-[#FFE033] transition-colors"
+                >
+                  TAP TO PLAY
+                </button>
               </div>
-            )}
 
-            <div className="relative z-10 pr-24 sm:pr-36 md:pr-44">
-              <p className="text-[#FFF6D9] text-lg sm:text-xl font-semibold mb-4">
-                We've got a {category.name} quiz for you!
-              </p>
-              <button
-                onClick={() => {
-                  if (contests.length > 0) {
-                    handlePlayClick(contests[0].id);
-                  } else {
-                    router.push('/all-contests');
-                  }
-                }}
-                className="bg-[#FFD602] text-[#0D0009] font-bold px-6 py-3 rounded-lg hover:bg-[#FFE033] transition-colors"
-              >
-                TAP TO PLAY
-              </button>
+              {/* Category/contest logo - contained within card */}
+              {heroLogoUrl && (
+                <div className="flex-shrink-0 w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 flex items-center justify-center">
+                  <img
+                    src={heroLogoUrl}
+                    alt={heroContest?.name || category.name}
+                    className="max-w-full max-h-full object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      img.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
           </div>

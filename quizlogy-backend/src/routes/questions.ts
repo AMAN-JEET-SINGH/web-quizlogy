@@ -111,6 +111,11 @@ router.get('/', isAdmin, async (req: Request, res: Response) => {
         options = [];
       }
 
+      let qCountries: string[] = ['ALL'];
+      try {
+        qCountries = JSON.parse(q.countries);
+      } catch {}
+
       return {
         id: q.id,
         contestId: q.contestId,
@@ -119,22 +124,31 @@ router.get('/', isAdmin, async (req: Request, res: Response) => {
           name: q.contest.name,
           category: q.contest.category,
           region: q.contest.region,
+          countries: (() => { try { return JSON.parse(q.contest.countries); } catch { return ['ALL']; } })(),
         } : null,
         question: q.question,
         type: q.type,
         media: q.media ? getImageUrl(q.media) : null,
         options,
         correctOption: q.correctOption,
+        countries: qCountries,
         order: q.order,
         createdAt: q.createdAt,
         updatedAt: q.updatedAt,
       };
     });
 
-    // Filter by region if provided (filter by contest region)
+    // Filter by country if provided (filter questions by their own countries field)
+    const { country } = req.query;
     let filteredQuestions = transformedQuestions;
-    if (region && region !== 'ALL') {
-      filteredQuestions = transformedQuestions.filter(q => 
+    if (country && country !== 'ALL') {
+      filteredQuestions = transformedQuestions.filter(q =>
+        q.countries.includes('ALL') || q.countries.includes(country as string)
+      );
+    }
+    // Legacy: also support region filter via contest region
+    if (region && region !== 'ALL' && !country) {
+      filteredQuestions = transformedQuestions.filter(q =>
         q.contest && q.contest.region === region
       );
     }
@@ -344,7 +358,7 @@ router.get('/contest/:contestId', async (req: Request, res: Response) => {
 router.post('/contest/:contestId', isAdmin, async (req: AdminRequest, res: Response) => {
   try {
     const { contestId } = req.params;
-    const { question, type, media, options, correctOption, order } = req.body;
+    const { question, type, media, options, correctOption, order, countries } = req.body;
 
     // Validation
     if (!question || !options || !correctOption) {
@@ -480,6 +494,11 @@ router.post('/contest/:contestId', isAdmin, async (req: AdminRequest, res: Respo
       questionOrder = lastQuestion ? lastQuestion.order + 1 : 1;
     }
 
+    // Build countries JSON
+    const countriesJson = Array.isArray(countries) && countries.length > 0
+      ? JSON.stringify(countries.map((c: string) => c.toUpperCase()))
+      : '["ALL"]';
+
     const createdQuestion = await prisma.question.create({
       data: {
         contestId,
@@ -489,6 +508,7 @@ router.post('/contest/:contestId', isAdmin, async (req: AdminRequest, res: Respo
         options: JSON.stringify(finalOptions),
         correctOption: correctOptionStr,
         order: questionOrder,
+        countries: countriesJson,
       },
     });
 
@@ -505,6 +525,7 @@ router.post('/contest/:contestId', isAdmin, async (req: AdminRequest, res: Respo
       media: createdQuestion.media ? getImageUrl(createdQuestion.media) : null,
       options: responseOptions,
       correctOption: createdQuestion.correctOption,
+      countries: (() => { try { return JSON.parse(createdQuestion.countries); } catch { return ['ALL']; } })(),
       order: createdQuestion.order,
     });
   } catch (error) {
@@ -648,6 +669,15 @@ router.put('/:id', isAdmin, async (req: AdminRequest, res: Response) => {
     if (req.body.correctOption !== undefined) updateData.correctOption = req.body.correctOption != null ? String(req.body.correctOption) : req.body.correctOption;
     if (req.body.order !== undefined) updateData.order = req.body.order;
 
+    // Handle countries array
+    if (req.body.countries !== undefined) {
+      if (Array.isArray(req.body.countries) && req.body.countries.length > 0) {
+        updateData.countries = JSON.stringify(req.body.countries.map((c: string) => c.toUpperCase()));
+      } else {
+        updateData.countries = '["ALL"]';
+      }
+    }
+
     const updatedQuestion = await prisma.question.update({
       where: { id },
       data: updateData,
@@ -666,6 +696,7 @@ router.put('/:id', isAdmin, async (req: AdminRequest, res: Response) => {
       media: updatedQuestion.media ? getImageUrl(updatedQuestion.media) : null,
       options: responseOptions,
       correctOption: updatedQuestion.correctOption,
+      countries: (() => { try { return JSON.parse(updatedQuestion.countries); } catch { return ['ALL']; } })(),
       order: updatedQuestion.order,
     });
   } catch (error) {

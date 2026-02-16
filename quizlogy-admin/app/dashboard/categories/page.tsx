@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { categoriesApi, Category, CreateCategoryData, uploadApi } from '@/lib/api';
 import { getImageUrl } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import ImageGallery from '@/components/ImageGallery';
+import MultiCountrySelect from '@/components/MultiCountrySelect';
 import './categories.css';
 
 export default function CategoryManagement() {
@@ -14,12 +15,14 @@ export default function CategoryManagement() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [formData, setFormData] = useState<CreateCategoryData>({
     name: '',
     description: '',
     imagePath: '',
     backgroundColor: '#FFFFFF',
     status: 'ACTIVE',
+    countries: ['ALL'] as string[],
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [importedData, setImportedData] = useState<any[]>([]);
@@ -125,7 +128,7 @@ export default function CategoryManagement() {
       alert('Please select at least one category to delete.');
       return;
     }
-    if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} selected category(ies)?`)) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} selected category(ies)?\n\nThis will also delete all contests in these categories.\nQuestions will be preserved.`)) return;
     try {
       setLoading(true);
       for (const id of selectedIds) {
@@ -177,19 +180,23 @@ export default function CategoryManagement() {
       imagePath: category.imagePath,
       backgroundColor: category.backgroundColor || '#FFFFFF',
       status: category.status,
+      countries: category.countries || ['ALL'],
     });
     setShowForm(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) {
+    if (!window.confirm('Are you sure you want to delete this category?\n\nThis will also delete all contests in this category.\nQuestions will be preserved.')) {
       return;
     }
     try {
       await categoriesApi.delete(id);
       fetchCategories();
-    } catch (err) {
-      setError('Failed to delete category');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to delete category');
     }
   };
 
@@ -226,6 +233,7 @@ export default function CategoryManagement() {
         description: row.description || row.Description || '',
         status: (row.status || row.Status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active',
         imagePath: '', // Will be set when user uploads image
+        countries: (row.countries || row.Countries || 'ALL').split(',').map((c: string) => c.trim()).filter(Boolean),
       })).filter((item: any) => item.name); // Only include items with names
 
       setImportedData(imported);
@@ -282,6 +290,7 @@ export default function CategoryManagement() {
             description: item.description || '',
             imagePath: item.imagePath || 'uploads/categories/placeholder.jpg',
             status: status as 'ACTIVE' | 'INACTIVE',
+            countries: item.countries || ['ALL'],
           };
           await categoriesApi.create(categoryData);
         } catch (err: any) {
@@ -316,6 +325,7 @@ export default function CategoryManagement() {
       Description: cat.description || '',
       'Image Path': cat.imagePath,
       Status: cat.status,
+      Countries: cat.countries?.join(', ') || 'ALL',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -331,6 +341,7 @@ export default function CategoryManagement() {
       imagePath: '',
       backgroundColor: '#FFFFFF',
       status: 'ACTIVE',
+      countries: ['ALL'],
     });
     setEditingCategory(null);
     setShowForm(false);
@@ -458,7 +469,7 @@ export default function CategoryManagement() {
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="category-form">
+        <form ref={formRef} onSubmit={handleSubmit} className="category-form">
           <h3>{editingCategory ? 'Edit Category' : 'Create New Category'}</h3>
           <div className="form-row">
             <div className="form-group">
@@ -481,6 +492,10 @@ export default function CategoryManagement() {
               </select>
             </div>
           </div>
+          <MultiCountrySelect
+            value={formData.countries || ['ALL']}
+            onChange={(countries) => setFormData({ ...formData, countries })}
+          />
           <div className="form-group">
             <label>Description</label>
             <textarea
@@ -513,7 +528,7 @@ export default function CategoryManagement() {
               </div>
               {formData.imagePath && (
                 <div className="image-preview">
-                  <div 
+                  <div
                     className="image-preview-container"
                     style={{
                       backgroundColor: formData.backgroundColor || '#FFFFFF',
@@ -526,8 +541,9 @@ export default function CategoryManagement() {
                       minHeight: '120px'
                     }}
                   >
-                    <img 
-                      src={getImageUrl(formData.imagePath)?.replace('localhost:3000', 'localhost:5001') || undefined} 
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={getImageUrl(formData.imagePath)}
                       alt="Preview"
                       style={{
                         display: 'block',
@@ -536,18 +552,27 @@ export default function CategoryManagement() {
                         objectFit: 'contain'
                       }}
                       onError={(e) => {
-                        // Hide image if it fails to load
-                        (e.target as HTMLImageElement).style.display = 'none';
+                        const img = e.target as HTMLImageElement;
+                        // Retry once with cache-busted URL after a short delay
+                        if (!img.dataset.retried) {
+                          img.dataset.retried = 'true';
+                          setTimeout(() => {
+                            img.src = getImageUrl(formData.imagePath) + '?t=' + Date.now();
+                          }, 500);
+                        }
                       }}
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, imagePath: '' })}
-                    className="btn-remove-image"
-                  >
-                    Remove
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', color: '#666' }}>{formData.imagePath.split('/').pop()}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, imagePath: '' })}
+                      className="btn-remove-image"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               )}
               {!formData.imagePath && (
@@ -620,6 +645,7 @@ export default function CategoryManagement() {
                 <div className="item-image">
                   {item.imagePath && getImageUrl(item.imagePath) ? (
                     <div className="image-preview-small">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={getImageUrl(item.imagePath)!.replace('localhost:3000', 'localhost:5001')} alt={item.name} />
                       <button
                         onClick={() => {
@@ -684,6 +710,7 @@ export default function CategoryManagement() {
               <th>Name</th>
               <th>Description</th>
               <th>Status</th>
+              <th>Countries</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -713,6 +740,7 @@ export default function CategoryManagement() {
                       height: '60px'
                     }}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={(category.imageUrl || getImageUrl(category.imagePath))?.replace('localhost:3000', 'localhost:5001')}
                       alt={`${category.name} - Path: ${category.imagePath || 'null'} - URL: ${category.imageUrl || 'null'}`}
@@ -724,17 +752,12 @@ export default function CategoryManagement() {
                       }}
                       onError={(e) => {
                         const img = e.target as HTMLImageElement;
-                        console.error('❌ Image failed to load:', {
-                          categoryName: category.name,
-                          categoryId: category.id,
-                          attemptedSrc: img.src,
-                          imagePath: category.imagePath,
-                          imagePathType: typeof category.imagePath,
-                          imagePathValue: category.imagePath,
-                          imageUrl: category.imageUrl,
-                          computedUrl: getImageUrl(category.imagePath),
-                          fullCategory: category,
-                        });
+                        if (!img.dataset.retried) {
+                          img.dataset.retried = 'true';
+                          setTimeout(() => {
+                            img.src = getImageUrl(category.imagePath) + '?t=' + Date.now();
+                          }, 500);
+                        }
                       }}
                       onLoad={() => {
                         console.log('✅ Image loaded successfully:', {
@@ -752,6 +775,7 @@ export default function CategoryManagement() {
                     {category.status}
                   </span>
                 </td>
+                <td>{category.countries?.join(', ') || 'ALL'}</td>
                 <td>
                   <div className="action-buttons">
                     <button onClick={() => handleEdit(category)} className="btn-edit">

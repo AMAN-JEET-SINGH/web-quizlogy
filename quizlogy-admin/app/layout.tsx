@@ -3,7 +3,7 @@ import { AdminProvider } from '@/lib/adminContext'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'FF Admin Panel',
+  title: 'Quizango Media PVT LTD - Admin Panel',
   description: 'Admin panel for managing categories and contests',
 }
 

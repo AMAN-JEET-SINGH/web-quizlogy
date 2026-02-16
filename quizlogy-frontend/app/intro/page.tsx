@@ -67,30 +67,29 @@ export default function IntroPage() {
     try {
       setLoading(true);
       
-      // Get user region for intro questions: India (IND) sees only IND questions, others see only ALL
-      let region: 'IND' | 'ALL' | undefined;
+      // Get user country code for intro questions (e.g. "IN", "US")
+      let country: string | undefined;
       try {
         const visitorData = await visitorTrackingApi.getVisitorInfo();
         const visitor = visitorData?.visitor;
-        if (visitor?.region === 'IND' || visitor?.countryCode === 'IN') {
-          region = 'IND';
-        } else if (visitor?.region === 'ALL' || visitor?.countryCode) {
-          region = 'ALL';
+        if (visitor?.countryCode && visitor.countryCode !== 'UN') {
+          country = visitor.countryCode; // ISO code e.g. "IN", "US"
+          localStorage.setItem('userCountryCode', visitor.countryCode);
         }
       } catch {
-        // Backend will derive region from request IP if we don't pass it
+        // Backend will derive country from request IP if we don't pass it
       }
 
       // Get previously shown question IDs from localStorage
       const shownQuestionIds = JSON.parse(localStorage.getItem('introShownQuestionIds') || '[]');
-      
-      // Fetch random two questions filtered by user country (India = IND only, others = ALL only)
-      const selectedQuestions = await twoQuestionsApi.getRandom(2, shownQuestionIds, region);
-      
+
+      // Fetch random two questions filtered by user country
+      const selectedQuestions = await twoQuestionsApi.getRandom(2, shownQuestionIds, country);
+
       if (selectedQuestions.length === 0) {
         // If no questions available, reset the tracking and try again
         localStorage.setItem('introShownQuestionIds', '[]');
-        const retryQuestions = await twoQuestionsApi.getRandom(2, [], region);
+        const retryQuestions = await twoQuestionsApi.getRandom(2, [], country);
         if (retryQuestions.length === 0) {
           throw new Error('No questions available');
         }

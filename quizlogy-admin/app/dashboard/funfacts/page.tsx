@@ -13,7 +13,45 @@ export default function FunFactsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [importedFunfacts, setImportedFunfacts] = useState<any[]>([]);
   const [showImportPreview, setShowImportPreview] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === funfacts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(funfacts.map(f => f.id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} fun fact(s)?`)) return;
+    try {
+      setLoading(true);
+      let deleted = 0;
+      for (const id of selectedIds) {
+        try {
+          await funfactsApi.delete(id);
+          deleted++;
+        } catch {}
+      }
+      setSelectedIds(new Set());
+      loadFunfacts();
+      alert(`${deleted} fun fact(s) deleted successfully.`);
+    } catch {
+      setError('Failed to delete selected fun facts');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadFunfacts = async () => {
     setLoading(true);
@@ -31,6 +69,7 @@ export default function FunFactsPage() {
 
   useEffect(() => {
     loadFunfacts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   const handleExport = () => {
@@ -177,6 +216,11 @@ export default function FunFactsPage() {
           <a href="/dashboard/funfacts/add" className="btn-add">
             Add Fun Fact
           </a>
+          {selectedIds.size > 0 && (
+            <button onClick={handleDeleteSelected} className="btn-delete" style={{ marginLeft: '8px' }}>
+              Delete Selected ({selectedIds.size})
+            </button>
+          )}
         </div>
       </div>
 
@@ -246,51 +290,82 @@ export default function FunFactsPage() {
           </a>
         </div>
       ) : (
-        <div className="funfacts-list">
-          {funfacts.map((funfact) => (
-            <div key={funfact.id} className="funfact-card">
-              {funfact.imageUrl && (
-                <div className="funfact-image">
-                  <img src={funfact.imageUrl!.replace('localhost:3000', 'localhost:5001')} alt={funfact.title} />
-                </div>
-              )}
-              <div className="funfact-header">
-                <h3>{funfact.title}</h3>
-                <div className="funfact-actions">
-                  <button
-                    onClick={() => toggleStatus(funfact.id, funfact.status)}
-                    className={`btn-status ${funfact.status.toLowerCase()}`}
-                    title={`Mark as ${funfact.status === 'ACTIVE' ? 'Inactive' : 'Active'}`}
-                  >
-                    {funfact.status === 'ACTIVE' ? '✓' : '○'}
-                  </button>
-                  <a
-                    href={`/dashboard/funfacts/edit/${funfact.id}`}
-                    className="btn-edit"
-                  >
-                    Edit
-                  </a>
-                  <button
-                    onClick={() => handleDelete(funfact.id)}
-                    className="btn-delete"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-              <p className="funfact-description">{funfact.description}</p>
-              <div className="funfact-meta">
-                <span className={`status-badge ${funfact.status.toLowerCase()}`}>
-                  {funfact.status}
-                </span>
-                {funfact.questionCount !== undefined && (
-                  <span className="questions-count">
-                    {funfact.questionCount} Questions
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="funfacts-table-container">
+          <table className="funfacts-table">
+            <thead>
+              <tr>
+                <th style={{ width: '40px' }}>
+                  <input
+                    type="checkbox"
+                    checked={funfacts.length > 0 && selectedIds.size === funfacts.length}
+                    onChange={toggleSelectAll}
+                    title="Select all"
+                  />
+                </th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Questions</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {funfacts.map((funfact) => (
+                <tr key={funfact.id} style={{ background: selectedIds.has(funfact.id) ? 'var(--admin-accent-light, #eef2ff)' : undefined }}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(funfact.id)}
+                      onChange={() => toggleSelect(funfact.id)}
+                    />
+                  </td>
+                  <td><strong>{funfact.title}</strong></td>
+                  <td>
+                    <span className="funfact-description-cell" title={funfact.description || ''}>
+                      {funfact.description
+                        ? funfact.description.length > 60
+                          ? funfact.description.substring(0, 60) + '...'
+                          : funfact.description
+                        : '-'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="questions-count-badge">
+                      {funfact.questionCount ?? 0}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${funfact.status.toLowerCase()}`}>
+                      {funfact.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="action-buttons">
+                      <button
+                        onClick={() => toggleStatus(funfact.id, funfact.status)}
+                        className={`btn-status ${funfact.status.toLowerCase()}`}
+                        title={`Mark as ${funfact.status === 'ACTIVE' ? 'Inactive' : 'Active'}`}
+                      >
+                        {funfact.status === 'ACTIVE' ? '✓' : '○'}
+                      </button>
+                      <a
+                        href={`/dashboard/funfacts/edit/${funfact.id}`}
+                        className="btn-edit"
+                      >
+                        Edit
+                      </a>
+                      <button
+                        onClick={() => handleDelete(funfact.id)}
+                        className="btn-delete"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

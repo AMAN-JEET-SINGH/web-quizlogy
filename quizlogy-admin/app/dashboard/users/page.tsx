@@ -23,6 +23,7 @@ export default function UsersManagement() {
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, search]);
 
   const fetchUsers = async () => {
@@ -120,7 +121,8 @@ export default function UsersManagement() {
                     <td>
                       <div className="user-name-cell">
                         {user.picture ? (
-                          <img 
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
                             src={user.picture} 
                             alt={user.name} 
                             className="user-avatar"

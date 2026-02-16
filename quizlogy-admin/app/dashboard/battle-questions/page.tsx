@@ -37,6 +37,7 @@ export default function AddBattleQuestionPage() {
     if (selectedBattle) {
       fetchQuestions();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBattle]);
 
   const fetchBattles = async () => {
@@ -492,6 +493,7 @@ export default function AddBattleQuestionPage() {
                       <td>
                         <div className="battle-name-cell">
                           <div className="battle-thumb-sm">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={battle.imageUrl || getImageUrl(battle.imagePath)} alt={battle.name} />
                           </div>
                           <span className="battle-name">{battle.name}</span>
@@ -656,9 +658,11 @@ export default function AddBattleQuestionPage() {
                     />
                     {formData.media && (
                       <div className="media-preview">
+                        {/* eslint-disable @next/next/no-img-element */}
                         {formData.type === 'IMAGE' && (
                           <img src={getImageUrl(formData.media)} alt="Preview" />
                         )}
+                        {/* eslint-enable @next/next/no-img-element */}
                         <span>{formData.media}</span>
                       </div>
                     )}
@@ -757,9 +761,11 @@ export default function AddBattleQuestionPage() {
                             <div className="question-text">{question.question}</div>
                             {question.media && question.type !== 'NONE' && (
                               <div className="question-media-small">
+                                {/* eslint-disable @next/next/no-img-element */}
                                 {question.type === 'IMAGE' && (
                                   <img src={getImageUrl(question.media)} alt="Question media" />
                                 )}
+                                {/* eslint-enable @next/next/no-img-element */}
                                 <span className="media-type-badge">{question.type}</span>
                               </div>
                             )}

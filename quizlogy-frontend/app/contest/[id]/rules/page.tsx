@@ -247,73 +247,63 @@ export default function ContestRulesPage() {
             </div>
 
             {/* Main Card */}
-            <div className="bg-[#0D0009] rounded-xl p-5 mb-6 border border-[#FFF6D9]/20 mx-5" style={{
+            <div className="bg-[#0D0009] rounded-xl p-4 mb-6 border border-[#FFF6D9]/20 mx-5" style={{
               boxShadow: '0px 0px 2px 0px #FFF6D9'
             }}>
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3">
                 {/* Left side - Icon */}
-                
-                <div className="bg-[#0D0009] rounded-xl min-w-[100px] w-[120px] flex flex-col overflow-hidden " >
-                          {/* Inner Box - Dark Top Section with Icon */}
-                          <div 
-                            className="flex-1 mt-4 ml-3 mr-2 bg-[#0D0009] rounded-t-xl p-3 flex items-center justify-center border border-[#FFF6D9]/30"
-                            
-                          >
-                            <div className="w-12 h-12">
-                              {contest.contestImage ? (
-                                <img
-                                  src={getImageUrl(contest.contestImage)}
-                                  alt={contest.name}
-                                  className="w-full h-full object-contain"
-                                  onError={(e) => {
-                                    const img = e.currentTarget;
-                                    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
-                                    const filename = contest.contestImage;
-                                    const triedFallback = img.dataset.triedFallback === 'true';
+                <div className="flex-shrink-0 w-[90px] flex flex-col overflow-hidden">
+                  {/* Inner Box - Dark Top Section with Icon */}
+                  <div className="bg-[#0D0009] rounded-t-xl p-2 flex items-center justify-center border border-[#FFF6D9]/30 border-b-0">
+                    <div className="w-10 h-10 flex items-center justify-center">
+                      {contest.contestImage ? (
+                        <img
+                          src={getImageUrl(contest.contestImage)}
+                          alt={contest.name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+                            const filename = contest.contestImage;
+                            const triedFallback = img.dataset.triedFallback === 'true';
 
-                                    if (filename && !filename.includes('/') && !triedFallback) {
-                                      img.dataset.triedFallback = 'true';
-                                      if (img.src.includes('/uploads/categories/')) {
-                                        img.src = `${baseUrl}/uploads/contests/${filename}`;
-                                      } else {
-                                        img.src = `${baseUrl}/uploads/categories/${filename}`;
-                                      }
-                                    } else {
-                                      // Image failed to load after trying fallbacks - silently hide it
-                                      img.style.display = 'none';
-                                    }
-                                  }}
-                                />
-                              ) : (
-                                <svg className="w-12 h-12 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
-                                </svg>
-                              )}
-                            </div>
-                          </div>
-                          {/* Inner Box - Bottom Section with Contest Name */}
-                          <div className="bg-[#FFF6D9] rounded-b-xl ml-3 mr-2 mb-4 px-2 py-2 flex items-center justify-center min-h-[40px]">
-                            <p className="text-[#0D0009] font-semibold text-xs text-center leading-tight">
-                              {contest.name.split(' ').map((word, idx, arr) => (
-                                <span key={idx}>
-                                  {word}
-                                  {idx < arr.length - 1 && <br />}
-                                </span>
-                              ))}
-                            </p>
-                          </div>
-                        </div>
+                            if (filename && !filename.includes('/') && !triedFallback) {
+                              img.dataset.triedFallback = 'true';
+                              if (img.src.includes('/uploads/categories/')) {
+                                img.src = `${baseUrl}/uploads/contests/${filename}`;
+                              } else {
+                                img.src = `${baseUrl}/uploads/categories/${filename}`;
+                              }
+                            } else {
+                              img.style.display = 'none';
+                            }
+                          }}
+                        />
+                      ) : (
+                        <svg className="w-10 h-10 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  {/* Inner Box - Bottom Section with Contest Name */}
+                  <div className="bg-[#FFF6D9] rounded-b-xl px-2 py-2 flex items-center justify-center border border-[#FFF6D9]/30 border-t-0" style={{ minHeight: '36px' }}>
+                    <p className="text-[#0D0009] font-semibold text-[10px] text-center leading-tight line-clamp-2 overflow-hidden">
+                      {contest.name}
+                    </p>
+                  </div>
+                </div>
 
                 {/* Right side - Content */}
-                <div className="flex-1">
-                  <p className="text-[#FFF6D9] text-lg font-bold mb-2">Play Quiz and Win</p>
-                  <div className="flex items-center gap-2 mb-2">
-                    <img src="/coin.svg" alt="Coins" className="w-5 h-5" />
-                    <span className="text-yellow-400 text-xl font-bold">{(contest?.winCoins || 24000).toLocaleString()}</span>
-                    <span className="text-[#FFF6D9] text-lg">COINS</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#FFF6D9] text-base font-bold mb-2">Play Quiz and Win</p>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <img src="/coin.svg" alt="Coins" className="w-5 h-5 flex-shrink-0" />
+                    <span className="text-yellow-400 text-lg font-bold">{(contest?.winCoins || 24000).toLocaleString()}</span>
+                    <span className="text-[#FFF6D9] text-base">COINS</span>
                   </div>
-                  <p className="text-[#FFF6D9] text-sm mb-1">Join and save the coins you win!</p>
-                  <p className="text-[#FFF6D9] text-sm">Wish you good luck!</p>
+                  <p className="text-[#FFF6D9] text-xs mb-1">Join and save the coins you win!</p>
+                  <p className="text-[#FFF6D9] text-xs">Wish you good luck!</p>
                 </div>
               </div>
             </div>

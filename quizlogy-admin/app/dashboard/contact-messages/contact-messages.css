@@ -233,3 +233,63 @@
     font-size: 12px;
   }
 }
+
+/* ═══════════════════════════════════════ */
+/* ── Dark Mode ── */
+/* ═══════════════════════════════════════ */
+
+[data-theme="dark"] .message-card {
+  background: #1a1a2e;
+  border-color: #2d2d44;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .message-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .message-card.unread {
+  background: rgba(59, 130, 246, 0.08);
+  border-left-color: #3b82f6;
+}
+
+[data-theme="dark"] .message-name-email strong {
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .message-email {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .message-date {
+  color: #6b6b88;
+}
+
+[data-theme="dark"] .message-content {
+  border-top-color: #2d2d44;
+}
+
+[data-theme="dark"] .message-content p {
+  color: #c0c0d0;
+}
+
+[data-theme="dark"] .messages-container .modal-content {
+  background: #1a1a2e;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .messages-container .modal-content h3 {
+  color: #e5e5f0;
+}
+
+[data-theme="dark"] .messages-container .modal-content p {
+  color: #9a9ab0;
+}
+
+[data-theme="dark"] .messages-container .btn-secondary {
+  background: #4b5563;
+}
+
+[data-theme="dark"] .messages-container .btn-secondary:hover {
+  background: #374151;
+}

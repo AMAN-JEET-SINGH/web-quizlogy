@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { twoQuestionsApi, TwoQuestion, CreateTwoQuestionData } from '@/lib/api';
+import MultiCountrySelect from '@/components/MultiCountrySelect';
 import * as XLSX from 'xlsx';
 import './two-questions.css';
 
@@ -16,6 +17,16 @@ export default function TwoQuestionsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<TwoQuestion | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  });
   
   // Form state
   const [formData, setFormData] = useState<CreateTwoQuestionData>({
@@ -24,7 +35,7 @@ export default function TwoQuestionsPage() {
     options: ['', '', '', ''],
     correctOption: '',
     status: 'ACTIVE',
-    region: 'ALL',
+    countries: ['ALL'] as string[],
   });
 
   const loadQuestions = async () => {
@@ -33,8 +44,11 @@ export default function TwoQuestionsPage() {
       const response = await twoQuestionsApi.getAll({
         status: statusFilter as 'ACTIVE' | 'INACTIVE' | 'ALL' | undefined,
         search: searchQuery || undefined,
+        page,
+        limit,
       });
       setQuestions(response.data || []);
+      setPagination(response.pagination);
       setError(null);
     } catch (error) {
       console.error('Error loading questions:', error);
@@ -46,7 +60,8 @@ export default function TwoQuestionsPage() {
 
   useEffect(() => {
     loadQuestions();
-  }, [statusFilter, searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, searchQuery, page]);
 
   const handleExport = () => {
     const data = questions.map((q) => ({
@@ -58,7 +73,7 @@ export default function TwoQuestionsPage() {
       'Correct Answer': q.correctOption,
       Type: q.type,
       Status: q.status,
-      Country: q.region || 'ALL',
+      Countries: q.countries?.join(', ') || q.region || 'ALL',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -85,7 +100,10 @@ export default function TwoQuestionsPage() {
           const columns = line.split(',').map(col => col.trim());
           
           if (columns.length >= 6) {
-            const regionCol = columns[6];
+            const countriesCol = columns[6];
+            const parsedCountries = countriesCol
+              ? countriesCol.split(/[,;]/).map((c: string) => c.trim().toUpperCase()).filter(Boolean)
+              : ['ALL'];
             const questionData = {
               question: columns[0] || '',
               option1: columns[1] || '',
@@ -95,7 +113,8 @@ export default function TwoQuestionsPage() {
               correctOption: columns[5] || '',
               type: 'NONE',
               status: 'ACTIVE',
-              region: (regionCol && String(regionCol).toUpperCase() === 'IND') ? 'IND' : 'ALL',
+              countries: parsedCountries.length > 0 ? parsedCountries : ['ALL'],
+              region: parsedCountries.includes('IND') && parsedCountries.length === 1 ? 'IND' : 'ALL',
             };
             
             if (questionData.question && questionData.option1 && questionData.option2) {
@@ -131,6 +150,8 @@ export default function TwoQuestionsPage() {
           if (hasHeaders) {
             // Excel with headers
             const row = jsonData[i] as any;
+            const countriesRaw = (row.Countries || row.countries || row.Country || row.country || row.Region || row.region || 'ALL').toString();
+            const parsedCountriesExcel = countriesRaw.split(/[,;]/).map((c: string) => c.trim().toUpperCase()).filter(Boolean);
             questionData = {
               question: row.Question || row.question || '',
               option1: row['Option 1'] || row.option1 || row['Option1'] || '',
@@ -140,13 +161,15 @@ export default function TwoQuestionsPage() {
               correctOption: row['Correct Answer'] || row.correctAnswer || row['CorrectAnswer'] || row.correctOption || '',
               type: (row.Type || row.type || 'NONE').toUpperCase(),
               status: (row.Status || row.status || 'ACTIVE').toUpperCase(),
-              region: (row.Country || row.country || row.Region || row.region || 'ALL').toString().toUpperCase() === 'IND' ? 'IND' : 'ALL',
+              countries: parsedCountriesExcel.length > 0 ? parsedCountriesExcel : ['ALL'],
+              region: parsedCountriesExcel.includes('IND') && parsedCountriesExcel.length === 1 ? 'IND' : 'ALL',
             };
           } else {
             // Excel without headers - positional
             const row = jsonData[i] as any[];
             if (row && Array.isArray(row) && row.length >= 6) {
-              const regionVal = row[6] != null ? String(row[6]).toUpperCase() : 'ALL';
+              const countriesVal = row[6] != null ? String(row[6]) : 'ALL';
+              const parsedCountriesArr = countriesVal.split(/[,;]/).map((c: string) => c.trim().toUpperCase()).filter(Boolean);
               questionData = {
                 question: String(row[0] || ''),
                 option1: String(row[1] || ''),
@@ -156,7 +179,8 @@ export default function TwoQuestionsPage() {
                 correctOption: String(row[5] || ''),
                 type: 'NONE',
                 status: 'ACTIVE',
-                region: regionVal === 'IND' ? 'IND' : 'ALL',
+                countries: parsedCountriesArr.length > 0 ? parsedCountriesArr : ['ALL'],
+                region: parsedCountriesArr.includes('IND') && parsedCountriesArr.length === 1 ? 'IND' : 'ALL',
               };
             }
           }
@@ -191,7 +215,7 @@ export default function TwoQuestionsPage() {
       'Correct Answer': item.correctOption || '',
       Type: item.type || 'NONE',
       Status: item.status || 'ACTIVE',
-      Country: (item as any).region || 'ALL',
+      Countries: (item as any).countries?.join(', ') || (item as any).region || 'ALL',
       Error: error,
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -228,13 +252,15 @@ export default function TwoQuestionsPage() {
             failedRows.push({ item, error: 'Correct option must be one of the provided options' });
             continue;
           }
+          const itemCountries = (item as any).countries || ['ALL'];
           await twoQuestionsApi.create({
             question: item.question,
             options: options,
             correctOption: correctOptionStr,
             type: item.type as 'NONE' | 'IMAGE' | 'VIDEO' | 'AUDIO',
             status: item.status as 'ACTIVE' | 'INACTIVE',
-            region: (item as any).region === 'IND' ? 'IND' : 'ALL',
+            countries: itemCountries,
+            region: itemCountries.includes('IND') && itemCountries.length === 1 ? 'IND' : 'ALL',
           });
           successCount++;
         } catch (err: any) {
@@ -356,7 +382,7 @@ export default function TwoQuestionsPage() {
       options: ['', '', '', ''],
       correctOption: '',
       status: 'ACTIVE',
-      region: 'ALL',
+      countries: ['ALL'] as string[],
     });
     setShowAddModal(true);
   };
@@ -369,7 +395,7 @@ export default function TwoQuestionsPage() {
       options: question.options.length === 4 ? question.options : [...question.options, '', '', '', ''].slice(0, 4),
       correctOption: question.correctOption,
       status: question.status,
-      region: question.region || 'ALL',
+      countries: question.countries || ['ALL'],
     });
     setShowAddModal(true);
   };
@@ -394,12 +420,14 @@ export default function TwoQuestionsPage() {
         return;
       }
 
+      const submitCountries = formData.countries || ['ALL'];
       const submitData = {
         ...formData,
         options: options,
         type: 'NONE' as const,
         media: undefined,
-        region: (formData.region === 'IND' ? 'IND' : 'ALL') as 'IND' | 'ALL',
+        countries: submitCountries,
+        region: (submitCountries.includes('IND') && submitCountries.length === 1 ? 'IND' : 'ALL') as 'IND' | 'ALL',
       };
 
       if (editingQuestion) {
@@ -415,7 +443,7 @@ export default function TwoQuestionsPage() {
         options: ['', '', '', ''],
         correctOption: '',
         status: 'ACTIVE',
-        region: 'ALL',
+        countries: ['ALL'] as string[],
       });
       setEditingQuestion(null);
       loadQuestions();
@@ -487,7 +515,10 @@ export default function TwoQuestionsPage() {
               type="text"
               placeholder="Search questions..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setPage(1);
+              }}
               className="search-input"
             />
           </div>
@@ -495,7 +526,10 @@ export default function TwoQuestionsPage() {
             <label>Status</label>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
             >
               <option value="">All Questions</option>
               <option value="ACTIVE">Active Only</option>
@@ -566,7 +600,7 @@ export default function TwoQuestionsPage() {
                 <th>Options</th>
                 <th>Type</th>
                 <th>Status</th>
-                <th>Region</th>
+                <th>Countries</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -614,7 +648,7 @@ export default function TwoQuestionsPage() {
                       {question.status === 'ACTIVE' ? '✓' : '○'}
                     </button>
                   </td>
-                  <td>{question.region || 'ALL'}</td>
+                  <td>{question.countries?.join(', ') || question.region || 'ALL'}</td>
                   <td>
                     <div className="action-buttons">
                       <button
@@ -635,6 +669,31 @@ export default function TwoQuestionsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && pagination.totalPages > 1 && (
+        <div className="pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '20px', marginBottom: '20px' }}>
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
+          >
+            Previous
+          </button>
+          <span className="pagination-info" style={{ color: '#666' }}>
+            Page {pagination.page} of {pagination.totalPages} ({pagination.total} total questions)
+          </span>
+          <button
+            className="pagination-btn"
+            onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+            disabled={page === pagination.totalPages}
+            style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', cursor: page === pagination.totalPages ? 'not-allowed' : 'pointer', opacity: page === pagination.totalPages ? 0.5 : 1 }}
+          >
+            Next
+          </button>
         </div>
       )}
 
@@ -709,14 +768,11 @@ export default function TwoQuestionsPage() {
               </div>
 
               <div className="form-group">
-                <label>Country (intro page)</label>
-                <select
-                  value={formData.region || 'ALL'}
-                  onChange={(e) => setFormData({ ...formData, region: e.target.value as 'IND' | 'ALL' })}
-                >
-                  <option value="ALL">ALL (everyone)</option>
-                  <option value="IND">IND (India only)</option>
-                </select>
+                <MultiCountrySelect
+                  value={formData.countries || ['ALL']}
+                  onChange={(countries) => setFormData({ ...formData, countries })}
+                  label="Countries (intro page)"
+                />
                 <span className="form-hint">Which users see this question on the intro page based on their country.</span>
               </div>
 

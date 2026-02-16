@@ -70,19 +70,24 @@ export const questionsApi = {
   },
 };
 
-// Two Questions API (for intro page) - filtered by user country: India sees IND questions, others see ALL
+// Two Questions API (for intro page) - filtered by user country via IP or explicit param
 export const twoQuestionsApi = {
   getRandom: async (
     count: number = 2,
     excludeIds: string[] = [],
-    region?: 'IND' | 'ALL'
+    country?: string // ISO country code e.g. "IN", "US" or legacy "IND"/"ALL"
   ): Promise<Question[]> => {
     const params: any = { count };
     if (excludeIds && excludeIds.length > 0) {
       params.excludeIds = excludeIds.join(',');
     }
-    if (region) {
-      params.region = region;
+    if (country) {
+      // Convert legacy region codes if passed
+      if (country === 'IND') {
+        params.country = 'IN';
+      } else if (country !== 'ALL') {
+        params.country = country;
+      }
     }
     const response = await api.get('/api/two-questions/random', { params });
     return response.data.data || [];
@@ -141,9 +146,15 @@ export const contestsApi = {
   getList: async (params?: {
     category?: string;
     status?: string;
-    region?: string;
   }): Promise<ContestListResponse> => {
-    const response = await api.get('/api/contestList', { params });
+    const queryParams: any = { ...params };
+    if (typeof window !== 'undefined') {
+      const country = localStorage.getItem('userCountryCode');
+      if (country && country !== 'UN') {
+        queryParams.country = country;
+      }
+    }
+    const response = await api.get('/api/contestList', { params: queryParams });
     return response.data;
   },
   
@@ -153,9 +164,16 @@ export const contestsApi = {
     return response.data;
   },
   
-  // Get contest by ID with questions
+  // Get contest by ID with questions (passes user country for question filtering)
   getContestById: async (contestId: string): Promise<any> => {
-    const response = await api.get(`/api/contest/${contestId}`);
+    const params: any = {};
+    if (typeof window !== 'undefined') {
+      const country = localStorage.getItem('userCountryCode');
+      if (country && country !== 'UN') {
+        params.country = country;
+      }
+    }
+    const response = await api.get(`/api/contest/${contestId}`, { params });
     return response.data;
   },
   
@@ -207,11 +225,21 @@ export interface Category {
 
 export const categoriesApi = {
   getAll: async (): Promise<Category[]> => {
-    const response = await api.get('/api/getContestCategories');
+    const params: any = {};
+    if (typeof window !== 'undefined') {
+      const country = localStorage.getItem('userCountryCode');
+      if (country && country !== 'UN') params.country = country;
+    }
+    const response = await api.get('/api/getContestCategories', { params });
     return response.data.results || [];
   },
   getAllWithDetails: async (): Promise<Category[]> => {
-    const response = await api.get('/api/categories');
+    const params: any = {};
+    if (typeof window !== 'undefined') {
+      const country = localStorage.getItem('userCountryCode');
+      if (country && country !== 'UN') params.country = country;
+    }
+    const response = await api.get('/api/categories', { params });
     return response.data || [];
   },
 };
@@ -315,7 +343,15 @@ export interface CoinHistory {
   type: 'EARNED' | 'SPENT' | 'REFUND' | 'LOGIN';
   description: string;
   contestId: string | null;
+  status: 'PENDING' | 'COMPLETED';
   createdAt: string;
+  // Contest result details
+  contestName?: string | null;
+  correctAnswers?: number | null;
+  wrongAnswers?: number | null;
+  totalQuestions?: number | null;
+  winningAmount?: number | null;
+  timeTaken?: number | null;
   user?: {
     id: string;
     name: string;
