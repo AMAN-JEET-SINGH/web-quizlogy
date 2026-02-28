@@ -276,15 +276,7 @@ export default function IntroPage() {
   const correctCount = answers.filter(r => r.isCorrect).length;
   const shouldShowPopup = showPopup && correctCount < 2;
 
-  if (error || (!loading && questions.length === 0)) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-800 via-purple-700 to-purple-900 flex items-center justify-center p-5">
-        <div className="bg-white rounded-lg p-6 text-red-600 text-center max-w-md">
-          {error || 'No questions available'}
-        </div>
-      </div>
-    );
-  }
+  const noQuestions = !loading && questions.length === 0;
   
 
   return (<>
@@ -305,7 +297,17 @@ export default function IntroPage() {
     <div className="min-h-screen  from-purple-800 via-purple-700 to-purple-900 px-5 py-0 pb-1 ">
     
       {/* Question Card Component or Result Card - Fixed height to prevent layout shift */}
-      {!loading && questions.length > 0 && (
+      {noQuestions ? (
+        <div className="max-w-md mx-auto mb-8 mt-10 text-center">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="w-full bg-[#FBD457] text-black py-5 rounded-xl font-bold text-lg transition-transform hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden shadow-lg animate-pulse"
+          >
+            <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent shiny-effect"></span>
+            Tap to Play
+          </button>
+        </div>
+      ) : !loading && questions.length > 0 ? (
         <div className="max-w-md mx-auto mb-8 ">
           {quizCompleted ? (
             <QuizResultCard
@@ -326,7 +328,7 @@ export default function IntroPage() {
             />
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Wrong Answer Popup - Currently commented out but kept for future use */}
       {/* 

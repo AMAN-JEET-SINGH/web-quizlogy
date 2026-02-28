@@ -72,6 +72,17 @@ export default function FunFactsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
+  const handleDownloadSample = () => {
+    const sampleData = [
+      { Title: 'Did You Know?', Description: 'The human brain uses 20% of the total oxygen in the body.', 'Image Path': '', Status: 'ACTIVE' },
+      { Title: 'Amazing Fact', Description: 'Honey never spoils. Archaeologists found 3000-year-old honey in Egyptian tombs.', 'Image Path': '', Status: 'ACTIVE' },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Fun Facts');
+    XLSX.writeFile(workbook, 'sample_funfacts.xlsx');
+  };
+
   const handleExport = () => {
     const data = funfacts.map((funfact) => ({
       Title: funfact.title,
@@ -201,6 +212,9 @@ export default function FunFactsPage() {
       <div className="page-header">
         <h2>Manage Fun Facts</h2>
         <div className="header-actions">
+          <button onClick={handleDownloadSample} className="btn-export" title="Download a sample Excel file with the expected format">
+            Sample File
+          </button>
           <label className="btn-import">
             Import from Excel
             <input

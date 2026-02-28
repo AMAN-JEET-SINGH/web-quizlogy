@@ -27,6 +27,9 @@ import { autoSeedCountries } from './utils/seedCountries';
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+// Trust reverse proxy (nginx) — required for secure cookies behind proxy
+app.set('trust proxy', 1);
+
 // Get uploads directory path
 // Use environment variable for production (set to /var/www/quizlogy/uploads)
 // Fallback to relative path for development
@@ -82,10 +85,12 @@ app.use(
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
     resave: false,
     saveUninitialized: false,
+    proxy: process.env.NODE_ENV === 'production', // Trust reverse proxy in production
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const, // 'none' required for cross-domain cookies
     },
   })
 );

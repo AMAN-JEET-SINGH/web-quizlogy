@@ -874,6 +874,8 @@ router.get('/contests', async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
     const search = req.query.search as string;
+    const categoryId = req.query.categoryId as string;
+    const noPagination = req.query.all === 'true';
 
     const where: any = {};
     if (search) {
@@ -881,6 +883,9 @@ router.get('/contests', async (req: Request, res: Response) => {
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
+    }
+    if (categoryId) {
+      where.categoryId = categoryId;
     }
 
     // Get total count for pagination
@@ -899,8 +904,7 @@ router.get('/contests', async (req: Request, res: Response) => {
       orderBy: {
         createdAt: 'desc',
       },
-      skip,
-      take: limit,
+      ...(noPagination ? {} : { skip, take: limit }),
     });
 
     const transformedContests = contests.map((contest) => ({

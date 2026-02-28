@@ -56,6 +56,7 @@ export default function ContestManagement() {
   const [showImageSelection, setShowImageSelection] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [categoryContests, setCategoryContests] = useState<Contest[]>([]);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [startDateText, setStartDateText] = useState('');
   const [endDateText, setEndDateText] = useState('');
@@ -118,9 +119,9 @@ export default function ContestManagement() {
     return start1 < end2 && start2 < end1;
   };
 
-  // Get contests for a specific category
+  // Get contests for a specific category (uses fully loaded categoryContests, not paginated contests)
   const getContestsByCategory = (categoryId: string): Contest[] => {
-    return contests.filter(c => c.categoryId === categoryId);
+    return categoryContests.filter(c => c.categoryId === categoryId);
   };
 
   // Get the next available time slot for a category (always 1 hour ahead of last contest or current time, whichever is later)
@@ -231,6 +232,17 @@ export default function ContestManagement() {
     }
   };
 
+  // Fetch ALL contests for a specific category (no pagination) for time slot/collision checks
+  const fetchCategoryContests = async (categoryId: string) => {
+    try {
+      const response = await contestsApi.getAll({ categoryId, all: 'true' });
+      setCategoryContests(response.data);
+    } catch (err) {
+      console.error('Failed to fetch category contests:', err);
+      setCategoryContests([]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -328,8 +340,10 @@ export default function ContestManagement() {
     }
   };
 
-  const handleEdit = (contest: Contest) => {
+  const handleEdit = async (contest: Contest) => {
     setEditingContest(contest);
+    // Load all contests for this category so collision checks work across all pages
+    await fetchCategoryContests(contest.categoryId);
     // Inherit countries from the category, not the contest
     const cat = categories.find(c => c.id === contest.categoryId);
     const catCountries = cat?.countries || contest.countries || ['ALL'];
@@ -743,8 +757,66 @@ export default function ContestManagement() {
     }
   };
 
-  const handleExport = () => {
-    const data = contests.map((contest) => {
+  const handleDownloadSample = () => {
+    const sampleData = [
+      {
+        Name: 'Science Challenge',
+        Description: 'Test your science knowledge',
+        'Category ID': '',
+        Category: 'Science Quiz',
+        'Image Path': '',
+        'Is Daily': 'No',
+        'Joining Fee': 0,
+        'Question Count': 20,
+        Duration: 60,
+        'Prize Pool': '50000,40000,30000,20000,10000',
+        Marking: 20,
+        'Negative Marking': 5,
+        'Lifeline Charge': 10,
+        'Start Date': new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        'End Date': new Date(Date.now() + 86400000 * 8).toISOString().split('T')[0],
+        'Result Date': new Date(Date.now() + 86400000 * 9).toISOString().split('T')[0],
+        'Daily Start Time': '',
+        'Daily End Time': '',
+      },
+      {
+        Name: 'Daily Math Quiz',
+        Description: 'Daily math practice',
+        'Category ID': '',
+        Category: 'Math Quiz',
+        'Image Path': '',
+        'Is Daily': 'Yes',
+        'Joining Fee': 0,
+        'Question Count': 10,
+        Duration: 30,
+        'Prize Pool': '5000,4000,3000,2000,1000',
+        Marking: 20,
+        'Negative Marking': 5,
+        'Lifeline Charge': 10,
+        'Start Date': '',
+        'End Date': '',
+        'Result Date': '',
+        'Daily Start Time': '15:00',
+        'Daily End Time': '16:00',
+      },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Contests');
+    XLSX.writeFile(workbook, 'sample_contests.xlsx');
+  };
+
+  const handleExport = async () => {
+    // Fetch ALL contests (not just current page)
+    let allContests = contests;
+    try {
+      const response = await contestsApi.getAll({ all: 'true', search: searchQuery || undefined });
+      allContests = response.data;
+    } catch (err) {
+      console.error('Failed to fetch all contests for export, using current page:', err);
+    }
+
+    const data = allContests.map((contest) => {
       // Parse prize pool if it's a string
       let prizePoolArray: string[] = [];
       try {
@@ -814,6 +886,7 @@ export default function ContestManagement() {
     setWinCoinsForTitle(5000);
     setEditingContest(null);
     setShowForm(false);
+    setCategoryContests([]);
   };
 
   if (initialLoad) {
@@ -841,6 +914,9 @@ export default function ContestManagement() {
             className="search-input"
             style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', marginRight: '10px' }}
           />
+          <button onClick={handleDownloadSample} className="btn-export" title="Download a sample Excel file with the expected format">
+            Sample File
+          </button>
           <label className="btn-import">
             Import from Excel
             <input
@@ -977,47 +1053,87 @@ export default function ContestManagement() {
             <label>Pick a Category *</label>
             <select
               value={formData.categoryId}
-              onChange={(e) => {
+              onChange={async (e) => {
                 const newCategoryId = e.target.value;
-                
+
+                // Immediately set the categoryId and inherit countries
+                const selectedCat = categories.find(c => c.id === newCategoryId);
+                const catCountries = selectedCat?.countries || ['ALL'];
+                setFormData(prev => ({ ...prev, categoryId: newCategoryId, countries: catCountries }));
+
+                // Fetch ALL contests for the selected category (not just current page)
+                if (newCategoryId) {
+                  await fetchCategoryContests(newCategoryId);
+                } else {
+                  setCategoryContests([]);
+                }
+
                 // Auto-fill all fields when category is selected (for both new and editing contests)
                 if (!isDaily && newCategoryId) {
-                  const nextSlot = getNextAvailableTimeSlot(newCategoryId);
-                  if (nextSlot) {
-                    // Auto-fill dates and times
-                    const startDateTime = new Date(`${nextSlot.startDate}T${nextSlot.startTime}`);
-                    const endDateTime = new Date(`${nextSlot.endDate}T${nextSlot.endTime}`);
-                    const resultDateTime = new Date(`${nextSlot.resultDate}T00:00`);
-                    
-                    // Auto-inherit countries from the selected category
-                    const selectedCat = categories.find(c => c.id === newCategoryId);
-                    const catCountries = selectedCat?.countries || ['ALL'];
-
-                    setFormData(prev => ({
-                      ...prev,
-                      categoryId: newCategoryId,
-                      startDate: startDateTime.toISOString(),
-                      endDate: endDateTime.toISOString(),
-                      resultDate: resultDateTime.toISOString(),
-                      // Keep existing values for other fields, or use defaults if empty
-                      name: prev.name || '',
-                      description: prev.description || '',
-                      joiningFee: prev.joiningFee || 0,
-                      questionCount: prev.questionCount || 20,
-                      duration: prev.duration || 60,
-                      countries: catCountries,
-                      marking: prev.marking || 20,
-                      negativeMarking: prev.negativeMarking || 5,
-                      lifeLineCharge: prev.lifeLineCharge || 10,
-                    }));
-                    setFromTime(nextSlot.startTime);
-                    setToTime(nextSlot.endTime);
+                  // Fetch all contests for this category to compute correct time slot
+                  let catContests: Contest[] = [];
+                  try {
+                    const response = await contestsApi.getAll({ categoryId: newCategoryId, all: 'true' });
+                    catContests = response.data;
+                  } catch (err) {
+                    console.error('Failed to fetch category contests:', err);
                   }
-                } else {
-                  // Auto-inherit countries from the selected category
-                  const selectedCat = categories.find(c => c.id === newCategoryId);
-                  const catCountries = selectedCat?.countries || ['ALL'];
-                  setFormData({ ...formData, categoryId: newCategoryId, countries: catCountries });
+
+                  // Compute next available time slot using all contests in this category
+                  const nonDailyContests = catContests
+                    .filter(c => !(c as any).isDaily && c.startDate && c.endDate)
+                    .map(c => ({
+                      start: new Date(c.startDate!),
+                      end: new Date(c.endDate!),
+                    }))
+                    .sort((a, b) => a.end.getTime() - b.end.getTime());
+
+                  let nextStart: Date;
+                  const now = new Date();
+                  const currentTimePlus1Hour = new Date(now);
+                  currentTimePlus1Hour.setHours(currentTimePlus1Hour.getHours() + 1);
+                  currentTimePlus1Hour.setMinutes(0, 0, 0);
+
+                  if (nonDailyContests.length === 0) {
+                    nextStart = currentTimePlus1Hour;
+                  } else {
+                    const lastContest = nonDailyContests[nonDailyContests.length - 1];
+                    const lastContestEndPlus1Hour = new Date(lastContest.end);
+                    lastContestEndPlus1Hour.setHours(lastContestEndPlus1Hour.getHours() + 1);
+                    lastContestEndPlus1Hour.setMinutes(0, 0, 0);
+                    nextStart = lastContestEndPlus1Hour > currentTimePlus1Hour ? lastContestEndPlus1Hour : currentTimePlus1Hour;
+                  }
+
+                  const nextEnd = new Date(nextStart);
+                  nextEnd.setDate(nextEnd.getDate() + 7);
+                  const resultDate = new Date(nextEnd);
+                  resultDate.setDate(resultDate.getDate() + 1);
+
+                  const startDateTime = nextStart;
+                  const endDateTime = nextEnd;
+                  const resultDateTime = resultDate;
+
+                  const startTime = `${String(startDateTime.getHours()).padStart(2, '0')}:${String(startDateTime.getMinutes()).padStart(2, '0')}`;
+                  const endTime = `${String(endDateTime.getHours()).padStart(2, '0')}:${String(endDateTime.getMinutes()).padStart(2, '0')}`;
+
+                  setFormData(prev => ({
+                    ...prev,
+                    categoryId: newCategoryId,
+                    startDate: startDateTime.toISOString(),
+                    endDate: endDateTime.toISOString(),
+                    resultDate: resultDateTime.toISOString(),
+                    name: prev.name || '',
+                    description: prev.description || '',
+                    joiningFee: prev.joiningFee || 0,
+                    questionCount: prev.questionCount || 20,
+                    duration: prev.duration || 60,
+                    countries: catCountries,
+                    marking: prev.marking || 20,
+                    negativeMarking: prev.negativeMarking || 5,
+                    lifeLineCharge: prev.lifeLineCharge || 10,
+                  }));
+                  setFromTime(startTime);
+                  setToTime(endTime);
                 }
               }}
               required

@@ -234,7 +234,7 @@ export const categoriesApi = {
     return response.data.results || [];
   },
   getAllWithDetails: async (): Promise<Category[]> => {
-    const params: any = {};
+    const params: any = { status: 'ACTIVE' };
     if (typeof window !== 'undefined') {
       const country = localStorage.getItem('userCountryCode');
       if (country && country !== 'UN') params.country = country;

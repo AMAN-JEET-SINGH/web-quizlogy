@@ -63,6 +63,37 @@ export default function TwoQuestionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, searchQuery, page]);
 
+  const handleDownloadSample = () => {
+    const sampleData = [
+      {
+        Question: 'What is 2 + 2?',
+        'Option 1': '3',
+        'Option 2': '4',
+        'Option 3': '5',
+        'Option 4': '6',
+        'Correct Answer': '4',
+        Type: 'NONE',
+        Status: 'ACTIVE',
+        Countries: 'ALL',
+      },
+      {
+        Question: 'Which is the largest ocean?',
+        'Option 1': 'Atlantic',
+        'Option 2': 'Indian',
+        'Option 3': 'Pacific',
+        'Option 4': 'Arctic',
+        'Correct Answer': 'Pacific',
+        Type: 'NONE',
+        Status: 'ACTIVE',
+        Countries: 'ALL',
+      },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Two Questions');
+    XLSX.writeFile(workbook, 'sample_two_questions.xlsx');
+  };
+
   const handleExport = () => {
     const data = questions.map((q) => ({
       Question: q.question,
@@ -461,6 +492,9 @@ export default function TwoQuestionsPage() {
       <div className="page-header">
         <h2>Manage Intro Two Questions</h2>
         <div className="header-actions">
+          <button onClick={handleDownloadSample} className="btn-export" title="Download a sample Excel file with the expected format">
+            Sample File
+          </button>
           <label className="btn-import">
             Import from Excel/CSV
             <input

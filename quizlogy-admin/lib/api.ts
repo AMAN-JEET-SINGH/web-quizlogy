@@ -29,8 +29,6 @@ api.interceptors.request.use(
 );
 
 // Response interceptor
-let isRedirecting = false;
-
 api.interceptors.response.use(
   (response) => {
     // Skip logging for blob responses (CSV exports, etc.)
@@ -73,16 +71,8 @@ api.interceptors.response.use(
       });
     }
     
-    if (error.response?.status === 401) {
-      // Handle unauthorized - only redirect if not already on login page
-      if (typeof window !== 'undefined' && !isRedirecting) {
-        const currentPath = window.location.pathname;
-        if (currentPath !== '/auth/login' && !currentPath.startsWith('/auth/')) {
-          isRedirecting = true;
-          window.location.href = '/auth/login';
-        }
-      }
-    }
+    // 401 errors are handled by AdminProvider's checkStatus — no hard redirect here.
+    // The AdminProvider will set isAdmin=false which triggers a graceful router.push to /auth/login.
     return Promise.reject(error);
   }
 );
@@ -269,7 +259,8 @@ export interface CreateCategoryData {
 
 export const categoriesApi = {
   getAll: async (status?: 'ACTIVE' | 'INACTIVE'): Promise<Category[]> => {
-    const params = status ? { status } : {};
+    const params: any = { country: 'ALL' };
+    if (status) params.status = status;
     const response = await api.get('/api/categories', { params });
     return response.data;
   },
@@ -387,6 +378,8 @@ export const contestsApi = {
     page?: number;
     limit?: number;
     search?: string;
+    categoryId?: string;
+    all?: string;
   }): Promise<ContestsResponse> => {
     const response = await api.get('/api/contests', { params });
     return response.data;

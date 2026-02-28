@@ -65,7 +65,7 @@ export default function QuestionBankPage() {
 
   const fetchContests = async () => {
     try {
-      const data = await contestsApi.getAll();
+      const data = await contestsApi.getAll({ all: 'true' });
       setContests(data.data);
     } catch (err) {
       console.error('Error fetching contests:', err);
@@ -296,6 +296,41 @@ export default function QuestionBankPage() {
     setShowForm(false);
   };
 
+  const handleDownloadSample = () => {
+    const sampleData = [
+      {
+        Question: 'What is the capital of France?',
+        Category: 'Geography',
+        Contest: 'World Quiz',
+        'Media Type': 'NONE',
+        'Media Path': '',
+        'Option 1': 'London',
+        'Option 2': 'Paris',
+        'Option 3': 'Berlin',
+        'Option 4': 'Madrid',
+        'Correct Option': 'Paris',
+        Countries: 'ALL',
+      },
+      {
+        Question: 'Which planet is known as the Red Planet?',
+        Category: 'Science',
+        Contest: 'Science Challenge',
+        'Media Type': 'NONE',
+        'Media Path': '',
+        'Option 1': 'Venus',
+        'Option 2': 'Mars',
+        'Option 3': 'Jupiter',
+        'Option 4': 'Saturn',
+        'Correct Option': 'Mars',
+        Countries: 'ALL',
+      },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Questions');
+    XLSX.writeFile(workbook, 'sample_questions.xlsx');
+  };
+
   const handleExport = () => {
     const data = questions.map((question) => {
       const getOptionText = (opt: any, index: number) => {
@@ -486,6 +521,9 @@ export default function QuestionBankPage() {
       <div className="admin-page-header page-header">
         <h1>Question Bank</h1>
         <div className="header-actions">
+          <button onClick={handleDownloadSample} className="btn-export" title="Download a sample Excel file with the expected format">
+            Sample File
+          </button>
           <label className="btn-import">
             Import from Excel
             <input

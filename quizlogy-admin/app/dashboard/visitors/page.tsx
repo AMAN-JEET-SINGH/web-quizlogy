@@ -16,7 +16,7 @@ export default function VisitorsManagement() {
   
   // Filter states
   const [page, setPage] = useState(1);
-  const [limit] = useState(50);
+  const [limit, setLimit] = useState(50);
   const [search, setSearch] = useState('');
   const [country, setCountry] = useState('');
   const [region, setRegion] = useState('');
@@ -45,7 +45,9 @@ export default function VisitorsManagement() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [selectedIpAddresses, setSelectedIpAddresses] = useState<Set<string>>(new Set());
+  const [showExportModal, setShowExportModal] = useState(false);
   const originFilterRef = useRef<HTMLDivElement>(null);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
 
   // Close origin dropdown on click outside
   useEffect(() => {
@@ -59,6 +61,19 @@ export default function VisitorsManagement() {
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showOriginFilter]);
+
+  // Close column selector on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(e.target as Node)) {
+        setShowColumnSelector(false);
+      }
+    };
+    if (showColumnSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showColumnSelector]);
 
   // Column visibility state - all columns available by default
   const [visibleColumns, setVisibleColumns] = useState({
@@ -103,7 +118,7 @@ export default function VisitorsManagement() {
     fetchStats();
     fetchCountries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, country, region, deviceType, os, browser, sortBy, sortOrder, selectedOrigins, dateFrom, dateTo]);
+  }, [page, limit, search, country, region, deviceType, os, browser, sortBy, sortOrder, selectedOrigins, dateFrom, dateTo]);
 
   const fetchVisitors = async () => {
     try {
@@ -161,18 +176,104 @@ export default function VisitorsManagement() {
     }
   };
 
-  const handleExportCSV = async () => {
+  const columnKeyToLabel: Record<string, string> = {
+    ipAddress: 'IP Address',
+    country: 'Country',
+    countryCode: 'Country Code',
+    region: 'Region',
+    deviceType: 'Device Type',
+    os: 'OS',
+    browser: 'Browser',
+    screenResolution: 'Screen Resolution',
+    visitCount: 'Visit Count',
+    clickCount: 'Click Count',
+    lastSessionClicks: 'Session Clicks',
+    lastVisitedPage: 'Last Visited Page',
+    exitPage: 'Exit Page',
+    firstVisit: 'First Visit',
+    lastVisit: 'Last Visit',
+    timeStamp: 'Time Stamp',
+    origin: 'Origin',
+    cfConnectingIp: 'CF-Connecting-IP',
+    cfIpCountry: 'CF-IP-Country',
+    referer: 'Referer',
+    secChUa: 'Sec-CH-UA',
+    secChUaFullVersionList: 'Sec-CH-UA-Full-Version',
+    secChUaPlatform: 'Sec-CH-UA-Platform',
+    userAgent: 'User-Agent',
+    xRealIp: 'X-Real-IP',
+    xRequestedWith: 'X-Requested-With',
+  };
+
+  const handleExportCSV = async (mode: 'all' | 'visible') => {
     try {
       setExporting(true);
-      const blob = await visitorsApi.exportCSV();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `visitors_export_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setShowExportModal(false);
+
+      if (mode === 'all') {
+        const blob = await visitorsApi.exportCSV();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `visitors_export_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // Export only visible columns
+        const blob = await visitorsApi.exportCSV();
+        const text = await blob.text();
+        const lines = text.split('\n');
+        if (lines.length === 0) return;
+
+        const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+        const visibleKeys = Object.entries(visibleColumns)
+          .filter(([key, val]) => val && key !== 'expand' && key !== 'actions')
+          .map(([key]) => key);
+        const visibleLabels = visibleKeys.map(k => columnKeyToLabel[k] || k);
+
+        // Find indices of visible columns in the CSV
+        const indices = visibleLabels.map(label => {
+          const idx = headers.findIndex(h => h.toLowerCase() === label.toLowerCase());
+          return idx;
+        }).filter(i => i !== -1);
+
+        const filteredLines = lines.map((line, lineIdx) => {
+          if (lineIdx === 0) {
+            return indices.map(i => headers[i]).join(',');
+          }
+          if (!line.trim()) return '';
+          // Simple CSV parse (handles quoted fields)
+          const fields: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let c = 0; c < line.length; c++) {
+            if (line[c] === '"') {
+              inQuotes = !inQuotes;
+              current += line[c];
+            } else if (line[c] === ',' && !inQuotes) {
+              fields.push(current);
+              current = '';
+            } else {
+              current += line[c];
+            }
+          }
+          fields.push(current);
+          return indices.map(i => fields[i] || '').join(',');
+        }).filter(l => l !== undefined);
+
+        const filteredCSV = filteredLines.join('\n');
+        const filteredBlob = new Blob([filteredCSV], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(filteredBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `visitors_export_visible_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
     } catch (err) {
       alert('Failed to export CSV');
       console.error(err);
@@ -343,11 +444,11 @@ export default function VisitorsManagement() {
             </p>
           </div>
           <div className="header-actions">
-            <button 
-              onClick={handleExportCSV}
+            <button
+              onClick={() => setShowExportModal(true)}
               disabled={exporting}
               className="btn-export-csv"
-              title="Export all visitors to CSV"
+              title="Export visitors to CSV"
             >
               <svg className="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -355,8 +456,8 @@ export default function VisitorsManagement() {
               {exporting ? 'Exporting...' : 'Export CSV'}
             </button>
             {hasActiveFilters && (
-              <button 
-                onClick={clearFilters} 
+              <button
+                onClick={clearFilters}
                 className="btn-clear-filters"
                 title="Clear all filters"
               >
@@ -366,8 +467,8 @@ export default function VisitorsManagement() {
                 Clear Filters
               </button>
             )}
-            <button 
-              onClick={() => setShowClearConfirm(true)} 
+            <button
+              onClick={() => setShowClearConfirm(true)}
               className="btn-clear-all"
               title="Clear all visitor data"
             >
@@ -376,8 +477,8 @@ export default function VisitorsManagement() {
               </svg>
               Clear All Data
             </button>
-            <button 
-              onClick={fetchVisitors} 
+            <button
+              onClick={fetchVisitors}
               className="btn-refresh"
               title="Refresh visitor list"
             >
@@ -385,16 +486,6 @@ export default function VisitorsManagement() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               Refresh
-            </button>
-            <button 
-              onClick={() => setShowColumnSelector(!showColumnSelector)}
-              className={`btn-column-selector ${showColumnSelector ? 'active' : ''}`}
-              title="Choose which columns to show in the table"
-            >
-              <svg className="btn-icon filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-              Table columns
             </button>
             {visitors.length > 0 && (
               <>
@@ -731,257 +822,120 @@ export default function VisitorsManagement() {
         </div>
       )}
 
-      {/* Table columns filter */}
-      {showColumnSelector && (
-        <div className="column-selector-panel">
-          <div className="column-selector-header">
-            <h3>Table columns</h3>
+      {/* Table Toolbar */}
+      <div className="table-toolbar">
+        <div className="table-toolbar-left">
+          <div className="column-selector-wrapper" ref={columnSelectorRef}>
             <button
-              onClick={() => setShowColumnSelector(false)}
-              className="close-btn"
+              onClick={() => setShowColumnSelector(!showColumnSelector)}
+              className={`btn-column-selector ${showColumnSelector ? 'active' : ''}`}
+              title="Choose which columns to show in the table"
             >
-              ×
+              <svg className="btn-icon filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Columns ({Object.values(visibleColumns).filter(v => v).length})
             </button>
+            {showColumnSelector && (
+              <div className="column-selector-dropdown">
+                <div className="column-selector-header">
+                  <h3>Table Columns</h3>
+                </div>
+                <div className="column-selector-grid">
+                  {[
+                    { key: 'expand', label: 'Expand' },
+                    { key: 'origin', label: 'Origin' },
+                    { key: 'ipAddress', label: 'IP Address' },
+                    { key: 'country', label: 'Country' },
+                    { key: 'countryCode', label: 'Country Code' },
+                    { key: 'region', label: 'Region' },
+                    { key: 'deviceType', label: 'Device Type' },
+                    { key: 'os', label: 'OS' },
+                    { key: 'browser', label: 'Browser' },
+                    { key: 'screenResolution', label: 'Screen Resolution' },
+                    { key: 'visitCount', label: 'Visit Count' },
+                    { key: 'clickCount', label: 'Click Count' },
+                    { key: 'lastSessionClicks', label: 'Session Clicks' },
+                    { key: 'lastVisitedPage', label: 'Last Visited Page' },
+                    { key: 'exitPage', label: 'Exit Page' },
+                    { key: 'firstVisit', label: 'First Visit' },
+                    { key: 'lastVisit', label: 'Last Visit' },
+                    { key: 'timeStamp', label: 'Time Stamp' },
+                  ].map(col => (
+                    <label key={col.key} className="column-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns[col.key as keyof typeof visibleColumns]}
+                        onChange={() => toggleColumnVisibility(col.key)}
+                      />
+                      <span>{col.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="column-selector-section">
+                  <h4 className="column-section-title">Header Information</h4>
+                  <div className="column-selector-grid">
+                    {[
+                      { key: 'cfConnectingIp', label: 'CF-Connecting-IP' },
+                      { key: 'cfIpCountry', label: 'CF-IP-Country' },
+                      { key: 'referer', label: 'Referer' },
+                      { key: 'secChUa', label: 'Sec-CH-UA' },
+                      { key: 'secChUaFullVersionList', label: 'Sec-CH-UA-Full-Version' },
+                      { key: 'secChUaPlatform', label: 'Sec-CH-UA-Platform' },
+                      { key: 'userAgent', label: 'User-Agent' },
+                      { key: 'xRealIp', label: 'X-Real-IP' },
+                      { key: 'xRequestedWith', label: 'X-Requested-With' },
+                    ].map(col => (
+                      <label key={col.key} className="column-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={visibleColumns[col.key as keyof typeof visibleColumns]}
+                          onChange={() => toggleColumnVisibility(col.key)}
+                        />
+                        <span>{col.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="column-selector-grid" style={{ marginTop: '12px' }}>
+                  <label className="column-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns.actions}
+                      onChange={() => toggleColumnVisibility('actions')}
+                    />
+                    <span>Actions</span>
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="column-selector-grid">
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.expand}
-                onChange={() => toggleColumnVisibility('expand')}
-              />
-              <span>Expand</span>
-            </label>
-            <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.origin}
-                  onChange={() => toggleColumnVisibility('origin')}
-                />
-                <span>Origin</span>
-              </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.ipAddress}
-                onChange={() => toggleColumnVisibility('ipAddress')}
-              />
-              <span>IP Address</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.country}
-                onChange={() => toggleColumnVisibility('country')}
-              />
-              <span>Country</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.countryCode}
-                onChange={() => toggleColumnVisibility('countryCode')}
-              />
-              <span>Country Code</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.region}
-                onChange={() => toggleColumnVisibility('region')}
-              />
-              <span>Region</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.deviceType}
-                onChange={() => toggleColumnVisibility('deviceType')}
-              />
-              <span>Device Type</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.os}
-                onChange={() => toggleColumnVisibility('os')}
-              />
-              <span>OS</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.browser}
-                onChange={() => toggleColumnVisibility('browser')}
-              />
-              <span>Browser</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.screenResolution}
-                onChange={() => toggleColumnVisibility('screenResolution')}
-              />
-              <span>Screen Resolution</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.visitCount}
-                onChange={() => toggleColumnVisibility('visitCount')}
-              />
-              <span>Visit Count</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.clickCount}
-                onChange={() => toggleColumnVisibility('clickCount')}
-              />
-              <span>Click Count</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.lastSessionClicks}
-                onChange={() => toggleColumnVisibility('lastSessionClicks')}
-              />
-              <span>Session Clicks</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.lastVisitedPage}
-                onChange={() => toggleColumnVisibility('lastVisitedPage')}
-              />
-              <span>Last Visited Page</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.exitPage}
-                onChange={() => toggleColumnVisibility('exitPage')}
-              />
-              <span>Exit Page</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.firstVisit}
-                onChange={() => toggleColumnVisibility('firstVisit')}
-              />
-              <span>First Visit</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.lastVisit}
-                onChange={() => toggleColumnVisibility('lastVisit')}
-              />
-              <span>Last Visit</span>
-            </label>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.timeStamp}
-                onChange={() => toggleColumnVisibility('timeStamp')}
-              />
-              <span>Time Stamp</span>
-            </label>
-          </div>
-          
-          {/* Header Information Fields */}
-          <div className="column-selector-section">
-            <h4 className="column-section-title">Header Information</h4>
-            <div className="column-selector-grid">
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.cfConnectingIp}
-                  onChange={() => toggleColumnVisibility('cfConnectingIp')}
-                />
-                <span>CF-Connecting-IP</span>
-              </label>
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.cfIpCountry}
-                  onChange={() => toggleColumnVisibility('cfIpCountry')}
-                />
-                <span>CF-IP-Country</span>
-              </label>
-              
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.referer}
-                  onChange={() => toggleColumnVisibility('referer')}
-                />
-                <span>Referer</span>
-              </label>
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.secChUa}
-                  onChange={() => toggleColumnVisibility('secChUa')}
-                />
-                <span>Sec-CH-UA</span>
-              </label>
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.secChUaFullVersionList}
-                  onChange={() => toggleColumnVisibility('secChUaFullVersionList')}
-                />
-                <span>Sec-CH-UA-Full-Version</span>
-              </label>
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.secChUaPlatform}
-                  onChange={() => toggleColumnVisibility('secChUaPlatform')}
-                />
-                <span>Sec-CH-UA-Platform</span>
-              </label>
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.userAgent}
-                  onChange={() => toggleColumnVisibility('userAgent')}
-                />
-                <span>User-Agent</span>
-              </label>
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.xRealIp}
-                  onChange={() => toggleColumnVisibility('xRealIp')}
-                />
-                <span>X-Real-IP</span>
-              </label>
-              <label className="column-checkbox">
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.xRequestedWith}
-                  onChange={() => toggleColumnVisibility('xRequestedWith')}
-                />
-                <span>X-Requested-With</span>
-              </label>
-            </div>
-          </div>
-          
-          <div className="column-selector-grid" style={{ marginTop: '16px' }}>
-            <label className="column-checkbox">
-              <input
-                type="checkbox"
-                checked={visibleColumns.actions}
-                onChange={() => toggleColumnVisibility('actions')}
-              />
-              <span>Actions</span>
-            </label>
+          <div className="rows-per-page">
+            <span className="rows-per-page-label">Show</span>
+            <select
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setPage(1);
+              }}
+              className="rows-per-page-select"
+            >
+              <option value={10}>10</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+            </select>
+            <span className="rows-per-page-label">entries</span>
           </div>
         </div>
-      )}
+        <div className="table-toolbar-right">
+          {!loading && (
+            <span className="table-toolbar-info">
+              Showing {visitors.length > 0 ? ((pagination.page - 1) * limit + 1) : 0}–{Math.min(pagination.page * limit, pagination.total)} of {pagination.total.toLocaleString()} entries
+            </span>
+          )}
+        </div>
+      </div>
 
       {loading ? (
         <div className="loading-state">
@@ -1507,6 +1461,74 @@ export default function VisitorsManagement() {
         </div>
       )}
       
+      {/* Export CSV Modal */}
+      {showExportModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowExportModal(false)}
+        >
+          <div
+            className="modal-content export-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="export-modal-header">
+              <div className="export-modal-icon">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
+              <div>
+                <h3>Export CSV</h3>
+                <p className="export-modal-subtitle">Choose what to include in the export</p>
+              </div>
+            </div>
+            <div className="export-modal-options">
+              <button
+                onClick={() => handleExportCSV('all')}
+                className="export-option-btn"
+                disabled={exporting}
+              >
+                <div className="export-option-icon">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                  </svg>
+                </div>
+                <div className="export-option-text">
+                  <span className="export-option-title">All Columns</span>
+                  <span className="export-option-desc">Export complete data with all fields</span>
+                </div>
+                <svg className="export-option-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handleExportCSV('visible')}
+                className="export-option-btn"
+                disabled={exporting}
+              >
+                <div className="export-option-icon export-option-icon-visible">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                </div>
+                <div className="export-option-text">
+                  <span className="export-option-title">Visible Columns Only</span>
+                  <span className="export-option-desc">Export only the {Object.values(visibleColumns).filter(v => v).length - 2} columns currently shown in the table</span>
+                </div>
+                <svg className="export-option-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            <div className="export-modal-footer">
+              <button onClick={() => setShowExportModal(false)} className="btn-cancel">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Clear All Confirmation Modal */}
       {showClearConfirm && (
         <div 

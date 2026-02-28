@@ -383,6 +383,39 @@ export default function AddBattleQuestionPage() {
     e.target.value = '';
   };
 
+  const handleDownloadSample = () => {
+    const sampleData = [
+      {
+        Order: 1,
+        Category: 'Math Battle',
+        Question: 'What is the square root of 144?',
+        Type: 'NONE',
+        Media: '',
+        'Option 1': '10',
+        'Option 2': '12',
+        'Option 3': '14',
+        'Option 4': '16',
+        'Correct Option': '12',
+      },
+      {
+        Order: 2,
+        Category: 'Math Battle',
+        Question: 'What is 15 x 15?',
+        Type: 'NONE',
+        Media: '',
+        'Option 1': '200',
+        'Option 2': '225',
+        'Option 3': '250',
+        'Option 4': '215',
+        'Correct Option': '225',
+      },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Battle Questions');
+    XLSX.writeFile(workbook, 'sample_battle_questions.xlsx');
+  };
+
   const handleExport = () => {
     if (!selectedBattle || questions.length === 0) {
       alert('No questions to export');
@@ -425,6 +458,10 @@ export default function AddBattleQuestionPage() {
               <button onClick={() => setShowForm(!showForm)} className="btn-add-new">
                 <span className="btn-icon">➕</span>
                 <span>{showForm ? 'Cancel' : 'Add Question'}</span>
+              </button>
+              <button onClick={handleDownloadSample} className="btn-export" title="Download a sample Excel file with the expected format">
+                <span className="btn-icon">📄</span>
+                <span>Sample File</span>
               </button>
               <label className="btn-import">
                 <span className="btn-icon">📥</span>

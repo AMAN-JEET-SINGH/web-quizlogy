@@ -45,7 +45,7 @@ function getImageUrl(imagePath: string): string {
 router.get('/getContestCategories', async (req: Request, res: Response) => {
   console.log('📥 GET /api/getContestCategories - Request received');
   try {
-    const { status, page = '1', limit = '10' } = req.query;
+    const { status, page = '1', limit = '100' } = req.query;
     console.log('Query params:', { status, page, limit });
 
     // Determine user's country code
@@ -54,7 +54,7 @@ router.get('/getContestCategories', async (req: Request, res: Response) => {
     const ipCountry = (req as any).clientCountryCode as string | undefined;
     const isAdminSession = !!(req.session as any)?.admin;
     let userCountry = 'ALL';
-    if (queryCountry && queryCountry !== 'ALL') {
+    if (queryCountry) {
       userCountry = queryCountry.toUpperCase();
     } else if (cfCountry) {
       userCountry = cfCountry.toUpperCase();
@@ -84,39 +84,16 @@ router.get('/getContestCategories', async (req: Request, res: Response) => {
     const categories = await prisma.category.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: {
-        contests: {
-          select: {
-            countries: true,
-            questions: { select: { countries: true } },
-          },
-        },
-      },
     });
 
-    // Filter categories: always keep "ALL" categories visible;
-    // only hide country-specific categories if they have no applicable contests/questions
+    // Filter categories: show if user's country matches the category's country list
     let filtered = categories;
     if (!isAdminSession && userCountry !== 'ALL') {
       filtered = categories.filter(cat => {
-        // "ALL" categories are always shown
         let catCountries: string[] = ['ALL'];
         try { catCountries = JSON.parse(cat.countries); } catch {}
-        if (catCountries.includes('ALL')) return true;
-
-        // Country-specific categories: check if they have applicable contests
-        return cat.contests.some((contest: any) => {
-          let cc: string[] = ['ALL'];
-          try { cc = JSON.parse(contest.countries); } catch {}
-          if (!cc.includes('ALL') && !cc.includes(userCountry)) return false;
-
-          const qs = contest.questions.map((q: any) => {
-            let qc: string[] = ['ALL'];
-            try { qc = JSON.parse(q.countries); } catch {}
-            return { _countries: qc };
-          });
-          return getApplicableQuestions(qs, userCountry).length > 0;
-        });
+        // Show category if it's global OR if user's country is in the list
+        return catCountries.includes('ALL') || catCountries.includes(userCountry);
       });
     }
 
@@ -124,8 +101,8 @@ router.get('/getContestCategories', async (req: Request, res: Response) => {
     const total = filtered.length;
     const paged = filtered.slice(skip, skip + limitNum);
 
-    // Transform to match expected format (strip contests from output)
-    const results = paged.map(({ contests, ...category }) => ({
+    // Transform to match expected format
+    const results = paged.map((category) => ({
       id: category.id,
       name: category.name,
       description: category.description || '',
@@ -164,7 +141,8 @@ router.get('/categories', async (req: Request, res: Response) => {
     const cfCountry = req.headers['cf-ipcountry'] as string | undefined;
     const ipCountry = (req as any).clientCountryCode as string | undefined;
     let userCountry = 'ALL';
-    if (queryCountry && queryCountry !== 'ALL') {
+    if (queryCountry) {
+      // Explicit country param — respect it as-is (including 'ALL' to skip filtering)
       userCountry = queryCountry.toUpperCase();
     } else if (cfCountry) {
       userCountry = cfCountry.toUpperCase();
@@ -177,7 +155,7 @@ router.get('/categories', async (req: Request, res: Response) => {
       where.status = status;
     }
 
-    // Filter by user's country (skip if country unknown)
+    // Filter by user's country (skip if country unknown or explicitly ALL)
     if (userCountry !== 'ALL') {
       where.OR = [
         { countries: { contains: '"ALL"' } },
@@ -188,44 +166,21 @@ router.get('/categories', async (req: Request, res: Response) => {
     const categories = await prisma.category.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: {
-        contests: {
-          select: {
-            countries: true,
-            questions: { select: { countries: true } },
-          },
-        },
-      },
     });
 
-    // Filter categories: always keep "ALL" categories visible;
-    // only hide country-specific categories if they have no applicable contests/questions
+    // Filter categories: show if user's country matches the category's country list
     let filtered = categories;
     if (userCountry !== 'ALL') {
       filtered = categories.filter(cat => {
-        // "ALL" categories are always shown
         let catCountries: string[] = ['ALL'];
         try { catCountries = JSON.parse(cat.countries); } catch {}
-        if (catCountries.includes('ALL')) return true;
-
-        // Country-specific categories: check if they have applicable contests
-        return cat.contests.some((contest: any) => {
-          let cc: string[] = ['ALL'];
-          try { cc = JSON.parse(contest.countries); } catch {}
-          if (!cc.includes('ALL') && !cc.includes(userCountry)) return false;
-
-          const qs = contest.questions.map((q: any) => {
-            let qc: string[] = ['ALL'];
-            try { qc = JSON.parse(q.countries); } catch {}
-            return { _countries: qc };
-          });
-          return getApplicableQuestions(qs, userCountry).length > 0;
-        });
+        // Show category if it's global OR if user's country is in the list
+        return catCountries.includes('ALL') || catCountries.includes(userCountry);
       });
     }
 
-    // Transform image paths based on environment (strip contests from output)
-    const transformedCategories = filtered.map(({ contests, ...category }) => {
+    // Transform image paths based on environment
+    const transformedCategories = filtered.map((category) => {
       const imageUrl = getImageUrl(category.imagePath);
       return {
         ...category,

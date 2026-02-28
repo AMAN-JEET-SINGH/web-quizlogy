@@ -59,7 +59,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({
   const isChecking = useRef(false);
 
   const checkStatus = useCallback(async () => {
-    // Don't check if already checked or currently checking
+    // Don't check if already successfully checked or currently checking
     if (hasChecked.current || isChecking.current) {
       return;
     }
@@ -75,12 +75,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({
       const response = await adminApi.checkStatus();
       setIsAdmin(response.isAdmin);
       setAdminData(response.adminData || null);
+      hasChecked.current = true; // Only mark checked on SUCCESS
     } catch (error) {
       setIsAdmin(false);
       setAdminData(null);
+      // Don't set hasChecked on failure — allow retry on next navigation
     } finally {
       setLoading(false);
-      hasChecked.current = true;
       isChecking.current = false;
     }
   }, []);

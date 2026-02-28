@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { categoriesApi, Category, CreateCategoryData, uploadApi } from '@/lib/api';
+import { categoriesApi, Category, CreateCategoryData, uploadApi, countriesApi, AppCountry } from '@/lib/api';
 import { getImageUrl } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import ImageGallery from '@/components/ImageGallery';
@@ -45,6 +45,8 @@ export default function CategoryManagement() {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterName, setFilterName] = useState<string>('');
   const [filterDescription, setFilterDescription] = useState<string>('');
+  const [filterCountry, setFilterCountry] = useState<string>('');
+  const [countryList, setCountryList] = useState<AppCountry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
   // Error timeout
@@ -60,6 +62,9 @@ export default function CategoryManagement() {
 
   useEffect(() => {
     fetchCategories();
+    countriesApi.getAll().then(res => {
+      if (res.data) setCountryList(res.data);
+    }).catch(() => {});
   }, []);
 
   const fetchCategories = async () => {
@@ -103,13 +108,21 @@ export default function CategoryManagement() {
     }
 
     if (filterDescription) {
-      filtered = filtered.filter(cat => 
+      filtered = filtered.filter(cat =>
         cat.description?.toLowerCase().includes(filterDescription.toLowerCase())
       );
     }
 
+    if (filterCountry) {
+      filtered = filtered.filter(cat => {
+        const countries = cat.countries || ['ALL'];
+        if (filterCountry === 'ALL') return countries.includes('ALL');
+        return countries.includes(filterCountry);
+      });
+    }
+
     setFilteredCategories(filtered);
-  }, [categories, filterStatus, filterName, filterDescription]);
+  }, [categories, filterStatus, filterName, filterDescription, filterCountry]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -148,6 +161,7 @@ export default function CategoryManagement() {
     setFilterStatus('');
     setFilterName('');
     setFilterDescription('');
+    setFilterCountry('');
     setFilteredCategories(categories);
     setShowFilter(false);
   };
@@ -319,6 +333,17 @@ export default function CategoryManagement() {
     }
   };
 
+  const handleDownloadSample = () => {
+    const sampleData = [
+      { Name: 'Science Quiz', Description: 'Questions about science and technology', Status: 'ACTIVE', Countries: 'ALL' },
+      { Name: 'History Quiz', Description: 'Questions about world history', Status: 'ACTIVE', Countries: 'IN, US' },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Categories');
+    XLSX.writeFile(workbook, 'sample_categories.xlsx');
+  };
+
   const handleExport = () => {
     const data = categories.map((cat) => ({
       Name: cat.name,
@@ -375,11 +400,17 @@ export default function CategoryManagement() {
             onClick={clearFilters} 
             className="btn-clear-filter" 
             title="Clear Filter"
-            disabled={!filterStatus && !filterName && !filterDescription}
+            disabled={!filterStatus && !filterName && !filterDescription && !filterCountry}
           >
             <svg className="filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
+          </button>
+          <button onClick={handleDownloadSample} className="btn-export" title="Download a sample Excel file with the expected format">
+            <svg className="filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Sample File</span>
           </button>
           <label className="btn-import">
             <svg className="filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -446,6 +477,20 @@ export default function CategoryManagement() {
                 placeholder="Enter description"
                 className="filter-input"
               />
+            </div>
+            <div className="filter-group">
+              <label>Country</label>
+              <select
+                value={filterCountry}
+                onChange={(e) => setFilterCountry(e.target.value)}
+                className="filter-select"
+              >
+                <option value="">All</option>
+                <option value="ALL">Global (ALL)</option>
+                {countryList.map(c => (
+                  <option key={c.code} value={c.code}>{c.name} ({c.code})</option>
+                ))}
+              </select>
             </div>
           </div>
           <button onClick={applyFilters} className="btn-apply-filter">

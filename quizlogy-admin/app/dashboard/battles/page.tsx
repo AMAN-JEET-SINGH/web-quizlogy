@@ -301,6 +301,17 @@ export default function BattleManagement() {
     }
   };
 
+  const handleDownloadSample = () => {
+    const sampleData = [
+      { Name: 'Math Battle', Description: 'Test your math skills', Status: 'ACTIVE' },
+      { Name: 'Geography Battle', Description: 'World geography questions', Status: 'ACTIVE' },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sample Battles');
+    XLSX.writeFile(workbook, 'sample_battles.xlsx');
+  };
+
   const handleExport = () => {
     const data = battles.map((battle) => ({
       Name: battle.name,
@@ -361,6 +372,10 @@ export default function BattleManagement() {
             <svg className="filter-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
+          </button>
+          <button onClick={handleDownloadSample} className="btn-export" title="Download a sample Excel file with the expected format">
+            <span className="btn-icon">📄</span>
+            <span>Sample File</span>
           </button>
           <label className="btn-import">
             <span className="btn-icon">📥</span>
